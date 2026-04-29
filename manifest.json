@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "网页插件模板",
+  "version": "1.0.0",
+  "description": "一个通用的网页插件模板项目",
+  "author": "Developer",
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["content.css"]
+    }
+  ],
+  "permissions": ["activeTab", "storage", "scripting"],
+  "host_permissions": ["<all_urls>"]
+}
