@@ -23,6 +23,39 @@ function convertToHighQualityJpg(url) {
   return baseUrl + '?imageView2/2/w/1000/q/95/format/jpeg';
 }
 
+function extractImageUrl(imgElement) {
+  if (!imgElement) return '';
+  
+  const placeholderPattern = /^data:image\/(gif|png);base64,R0lGODlh/;
+  
+  const src = imgElement.src || '';
+  
+  if (!placeholderPattern.test(src)) {
+    return src;
+  }
+  
+  const lazyAttrs = ['data-src', 'data-original', 'data-lazy-src', 'data-url', 'data-cfsrc', 'data-srcset'];
+  
+  for (const attr of lazyAttrs) {
+    const value = imgElement.getAttribute(attr);
+    if (value && !placeholderPattern.test(value)) {
+      return value;
+    }
+  }
+  
+  const srcset = imgElement.getAttribute('srcset');
+  if (srcset) {
+    const urls = srcset.split(',').map(s => s.trim().split(' ')[0]);
+    for (const url of urls) {
+      if (url && !placeholderPattern.test(url)) {
+        return url;
+      }
+    }
+  }
+  
+  return '';
+}
+
 function extractProductInfo() {
   const products = [];
   const seenTitles = new Set();
@@ -49,7 +82,7 @@ function extractProductInfo() {
     const imgElement = item.querySelector('img.wxWpAMbp._2s7BZSpH.goods-img-external') || 
                        item.querySelector('img[data-cui-image]') ||
                        item.querySelector('img');
-    const originalUrl = imgElement ? imgElement.src : '';
+    const originalUrl = extractImageUrl(imgElement);
     const imageUrl = convertToHighQualityJpg(originalUrl);
     
     products.push({
