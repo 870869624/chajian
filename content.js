@@ -11,6 +11,18 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
+function convertToHighQualityJpg(url) {
+  if (!url) return '';
+  
+  const baseUrl = url.split('?')[0];
+  
+  if (baseUrl.endsWith('.avif') || baseUrl.endsWith('.webp')) {
+    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + '?imageView2/2/w/1000/q/95/format/jpeg';
+  }
+  
+  return baseUrl + '?imageView2/2/w/1000/q/95/format/jpeg';
+}
+
 function extractProductInfo() {
   const products = [];
   const seenTitles = new Set();
@@ -37,7 +49,8 @@ function extractProductInfo() {
     const imgElement = item.querySelector('img.wxWpAMbp._2s7BZSpH.goods-img-external') || 
                        item.querySelector('img[data-cui-image]') ||
                        item.querySelector('img');
-    const imageUrl = imgElement ? imgElement.src : '';
+    const originalUrl = imgElement ? imgElement.src : '';
+    const imageUrl = convertToHighQualityJpg(originalUrl);
     
     products.push({
       title: title,
