@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "网页插件模板",
+  "name": "北斗店铺助手",
   "version": "1.0.0",
-  "description": "一个通用的网页插件模板项目",
+  "description": "北斗店铺助手",
   "author": "Developer",
   "action": {
     "default_popup": "popup.html"
