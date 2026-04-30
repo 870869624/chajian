@@ -65,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  previewBtn.addEventListener('click', () => {
+  previewBtn.addEventListener('click', async () => {
     if (products.length === 0) {
       status.textContent = '请先获取商品';
       status.style.color = '#FF9800';
@@ -75,13 +75,15 @@ document.addEventListener('DOMContentLoaded', () => {
     status.textContent = '预览模式';
     status.style.color = '#FF9800';
     
-    const encodedData = encodeURIComponent(JSON.stringify(products));
-    const previewUrl = chrome.runtime.getURL('preview.html') + '?data=' + encodedData;
+    await chrome.storage.local.set({ 'temu_products': products });
+    
+    const previewUrl = chrome.runtime.getURL('preview.html');
     window.open(previewUrl, '_blank');
   });
 
   clearBtn.addEventListener('click', () => {
     products = [];
+    chrome.storage.local.remove('temu_products');
     count.textContent = '0';
     status.textContent = '已清空';
     status.style.color = '#999';
@@ -100,7 +102,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const csvContent = [
       ['标题', '图片链接', '售价'],
       ...products.map(p => [p.title, p.imageUrl, p.price])
-    ].map(row => row.join(',')).join('\n');
+    ].map(row => row.map(cell => {
+      if (typeof cell === 'string' && cell.includes(',')) {
+        return `"${cell}"`;
+      }
+      return cell;
+    }).join(',')).join('\n');
     
     const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');

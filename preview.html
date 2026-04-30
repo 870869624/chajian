@@ -64,6 +64,11 @@
       background: #ffed4a;
     }
 
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .pagination {
       display: flex;
       gap: 5px;
@@ -76,8 +81,8 @@
 
     .product-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 15px;
       padding: 20px;
       border: 2px solid #ffd700;
       border-radius: 8px;
@@ -100,33 +105,33 @@
 
     .checkbox-container {
       position: absolute;
-      top: 10px;
-      left: 10px;
+      top: 8px;
+      left: 8px;
       z-index: 10;
     }
 
     .checkbox-container input {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       cursor: pointer;
       accent-color: #ffd700;
     }
 
     .product-image {
       width: 100%;
-      height: 200px;
+      height: 150px;
       object-fit: cover;
       background: #333;
     }
 
     .product-info {
-      padding: 15px;
+      padding: 12px;
     }
 
     .product-title {
-      font-size: 14px;
+      font-size: 12px;
       color: #fff;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       line-height: 1.4;
       display: -webkit-box;
       -webkit-line-clamp: 2;
@@ -135,7 +140,7 @@
     }
 
     .product-price {
-      font-size: 18px;
+      font-size: 14px;
       font-weight: bold;
       color: #ffd700;
     }
@@ -156,6 +161,30 @@
       padding: 50px;
       color: #ffd700;
     }
+
+    @media (max-width: 1400px) {
+      .product-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+
+    @media (max-width: 1200px) {
+      .product-grid {
+        grid-template-columns: repeat(4, 1fr);
+      }
+    }
+
+    @media (max-width: 900px) {
+      .product-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
   </style>
 </head>
 <body>
@@ -173,16 +202,16 @@
   </div>
 
   <div id="productGrid" class="product-grid">
-    <div class="no-data">暂无数据</div>
+    <div class="no-data">加载中...</div>
   </div>
 
   <div class="footer">
     <div class="pagination">
-      <button class="btn" onclick="goToFirstPage()" id="firstPageBtn">首页</button>
-      <button class="btn" onclick="goToPrevPage()" id="prevPageBtn">上一页</button>
+      <button class="btn" onclick="goToFirstPage()" id="firstPageBtn" disabled>首页</button>
+      <button class="btn" onclick="goToPrevPage()" id="prevPageBtn" disabled>上一页</button>
       <span id="pageInfo">第1/1页（1-0）</span>
-      <button class="btn" onclick="goToNextPage()" id="nextPageBtn">下一页</button>
-      <button class="btn" onclick="goToLastPage()" id="lastPageBtn">最后页</button>
+      <button class="btn" onclick="goToNextPage()" id="nextPageBtn" disabled>下一页</button>
+      <button class="btn" onclick="goToLastPage()" id="lastPageBtn" disabled>最后页</button>
     </div>
     <button class="btn primary" onclick="exportData()">导出</button>
   </div>
@@ -191,22 +220,21 @@
     let products = [];
     let selectedIds = new Set();
     let currentPage = 1;
-    const pageSize = 20;
+    const pageSize = 48;
 
-    function loadProducts() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const productsJson = urlParams.get('data');
-      if (productsJson) {
-        products = JSON.parse(decodeURIComponent(productsJson));
-        renderProducts();
+    async function loadProducts() {
+      const result = await chrome.storage.local.get('temu_products');
+      if (result.temu_products) {
+        products = result.temu_products;
       }
+      renderProducts();
     }
 
     function renderProducts() {
       const grid = document.getElementById('productGrid');
       
       if (products.length === 0) {
-        grid.innerHTML = '<div class="no-data">暂无数据</div>';
+        grid.innerHTML = '<div class="no-data">暂无数据，请先获取商品</div>';
         updateCount();
         updatePageInfo();
         return;
@@ -224,7 +252,7 @@
             <div class="checkbox-container">
               <input type="checkbox" ${isSelected ? 'checked' : ''} onchange="toggleSelect(${globalIndex})" />
             </div>
-            <img src="${product.imageUrl}" alt="${product.title}" class="product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27200%27 height=%27200%27%3E%3Crect fill=%27%23333%27 width=%27200%27 height=%27200%27/%3E%3Ctext fill=%27%23666%27 font-size=%2714%27 x=%2750%25%27 y=%2750%25%27 text-anchor=%27middle%27 dominant-baseline=%27middle%27%3E图片加载失败%3C/text%3E%3C/svg%3E'" />
+            <img src="${product.imageUrl}" alt="${product.title}" class="product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27150%27 height=%27150%27%3E%3Crect fill=%27%23333%27 width=%27150%27 height=%27150%27/%3E%3Ctext fill=%27%23666%27 font-size=%2712%27 x=%2750%25%27 y=%2750%25%27 text-anchor=%27middle%27 dominant-baseline=%27middle%27%3E图片加载失败%3C/text%3E%3C/svg%3E'" />
             <div class="product-info">
               <div class="product-title">${product.title}</div>
               <div class="product-price">${product.price}</div>
@@ -272,6 +300,8 @@
       
       selectedIds.clear();
       currentPage = 1;
+      
+      chrome.storage.local.set({ 'temu_products': products });
       renderProducts();
     }
 
@@ -287,10 +317,13 @@
       
       document.getElementById('pageInfo').textContent = `第${currentPage}/${totalPages}页（${startItem}-${endItem}）`;
       
-      document.getElementById('firstPageBtn').disabled = currentPage === 1;
-      document.getElementById('prevPageBtn').disabled = currentPage === 1;
-      document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
-      document.getElementById('lastPageBtn').disabled = currentPage >= totalPages;
+      const isFirstPage = currentPage === 1;
+      const isLastPage = currentPage >= totalPages;
+      
+      document.getElementById('firstPageBtn').disabled = isFirstPage;
+      document.getElementById('prevPageBtn').disabled = isFirstPage;
+      document.getElementById('nextPageBtn').disabled = isLastPage;
+      document.getElementById('lastPageBtn').disabled = isLastPage;
     }
 
     function goToFirstPage() {
@@ -341,7 +374,7 @@
       document.body.removeChild(link);
     }
 
-    window.onload = loadProducts;
+    document.addEventListener('DOMContentLoaded', loadProducts);
   </script>
 </body>
 </html>
