@@ -75,16 +75,9 @@ document.addEventListener('DOMContentLoaded', () => {
     status.textContent = '预览模式';
     status.style.color = '#FF9800';
     
-    const previewContent = products.map((p, index) => 
-      `<div style="margin: 10px; padding: 10px; border: 1px solid #ccc;">
-        <h4>${index + 1}. ${p.title}</h4>
-        <img src="${p.imageUrl}" width="100" />
-        <p>价格: ${p.price}</p>
-      </div>`
-    ).join('');
-    
-    const previewWindow = window.open('', '_blank');
-    previewWindow.document.write(`<html><body>${previewContent}</body></html>`);
+    const encodedData = encodeURIComponent(JSON.stringify(products));
+    const previewUrl = chrome.runtime.getURL('preview.html') + '?data=' + encodedData;
+    window.open(previewUrl, '_blank');
   });
 
   clearBtn.addEventListener('click', () => {
