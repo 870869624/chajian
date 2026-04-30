@@ -13,28 +13,37 @@ document.head.appendChild(style);
 
 function extractProductInfo() {
   const products = [];
+  const seenTitles = new Set();
   
   const productItems = document.querySelectorAll('[data-tooltip-title]');
   
   productItems.forEach((item) => {
     const title = item.getAttribute('data-tooltip-title');
     
+    const priceElement = item.querySelector('span._2XgTiMJi') || 
+                         item.querySelector('[data-type="price"] span');
+    const price = priceElement ? priceElement.textContent.trim() : '';
+    
+    if (!price || !title) {
+      return;
+    }
+    
+    if (seenTitles.has(title)) {
+      return;
+    }
+    
+    seenTitles.add(title);
+    
     const imgElement = item.querySelector('img.wxWpAMbp._2s7BZSpH.goods-img-external') || 
                        item.querySelector('img[data-cui-image]') ||
                        item.querySelector('img');
     const imageUrl = imgElement ? imgElement.src : '';
     
-    const priceElement = item.querySelector('span._2XgTiMJi') || 
-                         item.querySelector('[data-type="price"] span');
-    const price = priceElement ? priceElement.textContent.trim() : '';
-    
-    if (title || imageUrl || price) {
-      products.push({
-        title: title || '',
-        imageUrl: imageUrl || '',
-        price: price || ''
-      });
-    }
+    products.push({
+      title: title,
+      imageUrl: imageUrl,
+      price: price
+    });
   });
   
   return products;
