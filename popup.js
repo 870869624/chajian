@@ -9,23 +9,53 @@ document.addEventListener('DOMContentLoaded', () => {
   
   let products = [];
 
+  async function injectContentScript(tabId) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId: tabId },
+        files: ['content.js']
+      });
+      return true;
+    } catch (error) {
+      console.error('Failed to inject content script:', error);
+      return false;
+    }
+  }
+
+  async function getProductsFromPage() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    await injectContentScript(tab.id);
+
+    return new Promise((resolve) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'getProducts' }, (response) => {
+        if (chrome.runtime.lastError) {
+          console.error('Send message error:', chrome.runtime.lastError);
+          resolve({ success: false, error: chrome.runtime.lastError.message });
+        } else if (response && response.success) {
+          resolve({ success: true, data: response.data });
+        } else {
+          resolve({ success: false, error: 'No response' });
+        }
+      });
+    });
+  }
+
   startBtn.addEventListener('click', async () => {
     status.textContent = '获取中...';
     status.style.color = '#4080ff';
     
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      const result = await getProductsFromPage();
       
-      const response = await chrome.tabs.sendMessage(tab.id, { action: 'getProducts' });
-      
-      if (response && response.success) {
-        products = response.data;
+      if (result.success) {
+        products = result.data;
         count.textContent = products.length.toString();
         status.textContent = '获取完成';
         status.style.color = '#4CAF50';
         console.log('Products received:', products);
       } else {
-        status.textContent = '获取失败';
+        status.textContent = '获取失败: ' + (result.error || '未知错误');
         status.style.color = '#f44336';
       }
     } catch (error) {
