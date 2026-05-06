@@ -42,11 +42,39 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   startBtn.addEventListener('click', async () => {
+    const pageCount = parseInt(document.getElementById('pageCount').value) || 1;
+    const delayStart = parseFloat(document.getElementById('delayStart').value) || 1;
+    const delayEnd = parseFloat(document.getElementById('delayEnd').value) || 3;
+    
+    if (delayStart > delayEnd) {
+      status.textContent = '起始时间不能大于结束时间';
+      status.style.color = '#f44336';
+      return;
+    }
+    
     status.textContent = '获取中...';
     status.style.color = '#4080ff';
     
     try {
-      const result = await getProductsFromPage();
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      await injectContentScript(tab.id);
+      
+      status.textContent = `翻页中... (1/${pageCount})`;
+      
+      const result = await new Promise((resolve) => {
+        chrome.tabs.sendMessage(tab.id, { 
+          action: 'autoLoadMore', 
+          data: { pageCount, delayStart, delayEnd } 
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            resolve({ success: false, error: chrome.runtime.lastError.message });
+          } else if (response && response.success) {
+            resolve({ success: true, data: response.data });
+          } else {
+            resolve({ success: false, error: 'No response' });
+          }
+        });
+      });
       
       if (result.success) {
         products = result.data;

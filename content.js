@@ -397,6 +397,124 @@ function extractImageUrl(imgElement) {
   return '';
 }
 
+function findLoadMoreButton() {
+  const selectors = [
+    'div._3HKY2899',
+    'div[aria-label="查看更多"]',
+    'div[aria-label="查看更多商品"]',
+    'div[role="button"][aria-label*="查看更多"]',
+    'div[role="link"][aria-label*="查看更多"]',
+    'button[aria-label*="查看更多"]',
+    '._2ugbvrpI._3E4sGl93._28_m8Owy.R8mNGZXv._2rMaxXAr'
+  ];
+  
+  console.log('Looking for load more button...');
+  
+  for (const selector of selectors) {
+    try {
+      const element = document.querySelector(selector);
+      if (element) {
+        console.log('Found load more button with selector:', selector);
+        console.log('Button element:', element);
+        return element;
+      }
+    } catch (e) {
+      console.log('Selector failed:', selector, e.message);
+      continue;
+    }
+  }
+  
+  console.log('Trying text content search...');
+  const allElements = document.querySelectorAll('div, button, span');
+  for (const el of allElements) {
+    if (el.textContent && el.textContent.includes('查看更多')) {
+      console.log('Found load more button by text:', el);
+      return el;
+    }
+  }
+  
+  console.log('Load more button not found');
+  return null;
+}
+
+function getRandomDelay(min, max) {
+  return Math.random() * (max - min) + min;
+}
+
+function delay(seconds) {
+  return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+}
+
+function simulateClick(element) {
+  const event = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    view: window
+  });
+  element.dispatchEvent(event);
+  
+  const touchEvent = new TouchEvent('touchstart', {
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(touchEvent);
+}
+
+async function waitForLoadMore() {
+  return new Promise(resolve => {
+    const observer = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        if (mutation.addedNodes.length > 0) {
+          observer.disconnect();
+          resolve();
+          return;
+        }
+      }
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    setTimeout(() => {
+      observer.disconnect();
+      resolve();
+    }, 5000);
+  });
+}
+
+async function autoLoadMore(pageCount, delayStart, delayEnd) {
+  console.log('=== Starting auto load more ===');
+  console.log('Page count:', pageCount);
+  console.log('Delay range:', delayStart, '-', delayEnd, 'seconds');
+  
+  for (let i = 0; i < pageCount; i++) {
+    console.log('\n--- Page', i + 1, '---');
+    
+    const loadMoreBtn = findLoadMoreButton();
+    
+    if (!loadMoreBtn) {
+      console.log('Load more button not found, stopping auto load');
+      break;
+    }
+    
+    console.log('Clicking load more button...');
+    simulateClick(loadMoreBtn);
+    
+    if (i < pageCount - 1) {
+      const waitTime = getRandomDelay(delayStart, delayEnd);
+      console.log('Waiting', waitTime.toFixed(2), 'seconds');
+      await delay(waitTime);
+      
+      console.log('Waiting for page to load...');
+      await waitForLoadMore();
+    }
+  }
+  
+  console.log('\n=== Auto load more completed ===');
+}
+
 function extractProductInfo() {
   const products = [];
   const seenTitles = new Set();
@@ -704,5 +822,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else {
       sendResponse({ success: false, error: 'No products to preview' });
     }
+  } else if (request.action === 'autoLoadMore') {
+    console.log('Received request to auto load more');
+    const { pageCount, delayStart, delayEnd } = request.data;
+    autoLoadMore(pageCount, delayStart, delayEnd).then(() => {
+      const products = extractProductInfo();
+      sendResponse({ success: true, data: products });
+    }).catch((error) => {
+      console.error('Auto load more failed:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
   }
 });
