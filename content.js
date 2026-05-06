@@ -364,6 +364,18 @@ function convertToHighQualityJpg(url) {
   return baseUrl + '?imageView2/2/w/1000/q/95/format/jpeg';
 }
 
+function convertToThumbnailJpg(url) {
+  if (!url) return '';
+  
+  const baseUrl = url.split('?')[0];
+  
+  if (baseUrl.endsWith('.avif') || baseUrl.endsWith('.webp')) {
+    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + '?imageView2/2/w/300/q/75/format/jpeg';
+  }
+  
+  return baseUrl + '?imageView2/2/w/300/q/75/format/jpeg';
+}
+
 function extractImageUrl(imgElement) {
   if (!imgElement) return '';
   
@@ -673,6 +685,7 @@ function extractProductInfo(region = 'all') {
     products.push({
       title: title,
       imageUrl: imageUrl,
+      thumbnailUrl: convertToThumbnailJpg(originalUrl),
       price: price
     });
   });
@@ -797,7 +810,7 @@ function renderPreviewProducts() {
       <div class="preview-product-card ${isSelected ? 'selected' : ''}" data-index="${globalIndex}">
         <input type="checkbox" class="preview-product-checkbox" ${isSelected ? 'checked' : ''} data-index="${globalIndex}">
         <div class="preview-product-image-wrapper">
-          <img src="${product.imageUrl}" alt="${product.title}" class="preview-product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27200%27 height=%27200%27%3E%3Crect fill=%27%23333%27 width=%27200%27 height=%27200%27/%3E%3Ctext fill=%27%23666%27 font-size=%2714%27 x=%2750%25%27 y=%2750%25%27 text-anchor=%27middle%27 dominant-baseline=%27middle%27%3E图片加载失败%3C/text%3E%3C/svg%3E'" />
+          <img src="${product.thumbnailUrl || product.imageUrl}" alt="${product.title}" class="preview-product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27200%27 height=%27200%27%3E%3Crect fill=%27%23333%27 width=%27200%27 height=%27200%27/%3E%3Ctext fill=%27%23666%27 font-size=%2714%27 x=%2750%25%27 y=%2750%25%27 text-anchor=%27middle%27 dominant-baseline=%27middle%27%3E图片加载失败%3C/text%3E%3C/svg%3E'" />
         </div>
         <div class="preview-product-info">
           <h3 class="preview-product-title">${product.title}</h3>

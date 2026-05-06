@@ -134,6 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const xhr = new XMLHttpRequest();
       xhr.open('GET', url, true);
       xhr.responseType = 'blob';
+      xhr.timeout = 30000;
       xhr.onload = () => {
         if (xhr.status === 200) {
           resolve(xhr.response);
@@ -142,8 +143,40 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       };
       xhr.onerror = () => reject(new Error('Failed to download image'));
+      xhr.ontimeout = () => reject(new Error('Download timeout'));
       xhr.send();
     });
+  }
+
+  async function downloadImagesConcurrently(products, concurrency = 5) {
+    const results = new Map();
+    let index = 0;
+    
+    async function worker() {
+      while (index < products.length) {
+        const i = index++;
+        const product = products[i];
+        if (product.imageUrl) {
+          try {
+            const imageBlob = await downloadImage(product.imageUrl);
+            results.set(i, imageBlob);
+          } catch (error) {
+            console.warn(`Failed to download image for product ${i + 1}:`, error);
+            results.set(i, null);
+          }
+        } else {
+          results.set(i, null);
+        }
+      }
+    }
+    
+    const workers = [];
+    for (let i = 0; i < concurrency; i++) {
+      workers.push(worker());
+    }
+    
+    await Promise.all(workers);
+    return results;
   }
 
   function generateExcelContent(products) {
@@ -168,16 +201,22 @@ document.addEventListener('DOMContentLoaded', () => {
       status.style.color = '#FF9800';
       return;
     }
-    
-    status.textContent = '导出中...';
+
+    status.textContent = '正在下载图片...';
     status.style.color = '#4CAF50';
 
     try {
       const zip = new JSZip();
-      
+
       const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
       const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
+
+      status.textContent = '下载图片中... (0/' + products.length + ')';
       
+      const imageBlobs = await downloadImagesConcurrently(products, 5);
+      
+      status.textContent = '正在压缩...';
+
       for (let i = 0; i < products.length; i++) {
         const product = products[i];
         const productFolder = mainFolder.folder(`${i + 1}`);
@@ -185,29 +224,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const specFolder = productFolder.folder('规格图');
         const detailFolder = productFolder.folder('详情图');
 
-        if (product.imageUrl) {
-          try {
-            const imageBlob = await downloadImage(product.imageUrl);
-            specFolder.file('1-混合色.jpeg', imageBlob);
-            specFolder.file('2-混合色.jpeg', imageBlob);
-            specFolder.file('3-混合色.jpeg', imageBlob);
-            detailFolder.file('1.jpeg', imageBlob);
-            detailFolder.file('2.jpeg', imageBlob);
-            detailFolder.file('3.jpeg', imageBlob);
-          } catch (error) {
-            console.warn(`Failed to download image for product ${i + 1}:`, error);
-          }
+        const imageBlob = imageBlobs.get(i);
+        if (imageBlob) {
+          specFolder.file('1-混合色.jpeg', imageBlob);
+          specFolder.file('2-混合色.jpeg', imageBlob);
+          specFolder.file('3-混合色.jpeg', imageBlob);
+          detailFolder.file('1.jpeg', imageBlob);
+          detailFolder.file('2.jpeg', imageBlob);
+          detailFolder.file('3.jpeg', imageBlob);
         }
 
-        status.textContent = `导出中... (${i + 1}/${products.length})`;
+        status.textContent = `压缩中... (${i + 1}/${products.length})`;
       }
-      
+
       const excelContent = generateExcelContent(products);
       mainFolder.file('批量上架附加表格.xlsx', excelContent);
-      
+
+      status.textContent = '正在生成压缩包...';
       const content = await zip.generateAsync({ type: 'blob' });
       saveAs(content, `导出格式示例_${timestamp}.zip`);
-      
+
       status.textContent = '导出完成';
     } catch (error) {
       console.error('Export failed:', error);

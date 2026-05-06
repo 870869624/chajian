@@ -27,6 +27,9 @@ function arrayBufferToBase64(buffer) {
 
 async function downloadImage(url) {
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
     const response = await fetch(url, {
       method: 'GET',
       mode: 'cors',
@@ -35,8 +38,12 @@ async function downloadImage(url) {
         'Referer': 'https://www.kwcdn.com/',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Origin': 'https://www.kwcdn.com'
-      }
+      },
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
+    
     if (!response.ok) {
       console.error('[Background] Image download HTTP error:', response.status, response.statusText);
       throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
@@ -49,6 +56,41 @@ async function downloadImage(url) {
     console.error('[Background] Image URL:', url);
     throw error;
   }
+}
+
+async function downloadImagesConcurrently(products, concurrency = 5) {
+  const results = new Map();
+  let index = 0;
+  
+  async function worker() {
+    while (index < products.length) {
+      const i = index++;
+      const product = products[i];
+      if (product.imageUrl) {
+        try {
+          const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
+          console.log('[Background] Downloading image:', cleanedUrl);
+          const imageBlob = await downloadImage(cleanedUrl);
+          results.set(i, imageBlob);
+          console.log('[Background] Image downloaded successfully for product', i + 1);
+        } catch (error) {
+          console.warn('[Background] Failed to download image for product', i + 1, ':', error.message);
+          results.set(i, null);
+        }
+      } else {
+        console.log('[Background] No image URL for product', i + 1);
+        results.set(i, null);
+      }
+    }
+  }
+  
+  const workers = [];
+  for (let i = 0; i < concurrency; i++) {
+    workers.push(worker());
+  }
+  
+  await Promise.all(workers);
+  return results;
 }
 
 function generateExcelContent(products) {
@@ -95,6 +137,9 @@ async function handleExportFromPreview(products, sendResponse) {
     console.log('[Background] Creating main folder:', `导出格式示例_${timestamp}`);
     const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
     
+    console.log('[Background] Downloading images concurrently...');
+    const imageBlobs = await downloadImagesConcurrently(products, 5);
+    
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
       console.log('[Background] Processing product', i + 1, ':', product.title);
@@ -103,23 +148,17 @@ async function handleExportFromPreview(products, sendResponse) {
       const specFolder = productFolder.folder('规格图');
       const detailFolder = productFolder.folder('详情图');
       
-      if (product.imageUrl) {
-        try {
-          const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
-          console.log('[Background] Downloading image:', cleanedUrl);
-          const imageBlob = await downloadImage(cleanedUrl);
-          specFolder.file('1-混合色.jpeg', imageBlob);
-          specFolder.file('2-混合色.jpeg', imageBlob);
-          specFolder.file('3-混合色.jpeg', imageBlob);
-          detailFolder.file('1.jpeg', imageBlob);
-          detailFolder.file('2.jpeg', imageBlob);
-          detailFolder.file('3.jpeg', imageBlob);
-          console.log('[Background] Image downloaded successfully for product', i + 1);
-        } catch (error) {
-          console.warn('[Background] Failed to download image for product', i + 1, ':', error.message);
-        }
+      const imageBlob = imageBlobs.get(i);
+      if (imageBlob) {
+        specFolder.file('1-混合色.jpeg', imageBlob);
+        specFolder.file('2-混合色.jpeg', imageBlob);
+        specFolder.file('3-混合色.jpeg', imageBlob);
+        detailFolder.file('1.jpeg', imageBlob);
+        detailFolder.file('2.jpeg', imageBlob);
+        detailFolder.file('3.jpeg', imageBlob);
+        console.log('[Background] Image added for product', i + 1);
       } else {
-        console.log('[Background] No image URL for product', i + 1);
+        console.log('[Background] No image for product', i + 1);
       }
     }
     
