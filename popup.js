@@ -114,17 +114,12 @@ document.addEventListener('DOMContentLoaded', () => {
       p.price
     ]);
 
-    let content = headers.join('\t') + '\n';
-    rows.forEach(row => {
-      content += row.map(cell => {
-        if (typeof cell === 'string' && cell.includes('\t')) {
-          return `"${cell}"`;
-        }
-        return cell;
-      }).join('\t') + '\n';
-    });
+    const worksheetData = [headers, ...rows];
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, '商品列表');
 
-    return content;
+    return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
   }
 
   exportBtn.addEventListener('click', async () => {
@@ -164,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       const excelContent = generateExcelContent(products);
-      mainFolder.file('批量上架附加表格.tsv', excelContent);
+      mainFolder.file('批量上架附加表格.xlsx', excelContent);
       
       const content = await zip.generateAsync({ type: 'blob' });
       saveAs(content, `导出格式示例_${timestamp}.zip`);
