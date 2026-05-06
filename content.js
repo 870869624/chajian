@@ -397,7 +397,7 @@ function extractImageUrl(imgElement) {
   return '';
 }
 
-function findLoadMoreButton() {
+function findLoadMoreButton(region = 'all') {
   const selectors = [
     'div._2ugbvrpI._3E4sGl93._28_m8Owy.R8mNGZXv._2rMaxXAr',
     'div._3HKY2899 div[role="button"]',
@@ -410,10 +410,23 @@ function findLoadMoreButton() {
   ];
   
   console.log('=== Looking for load more button ===');
+  console.log('Region:', region);
+  
+  let container = document.body;
+  
+  if (region === 'storeGoods') {
+    container = document.querySelector('div.mainContent._22vl80tk._3Pga2OjH') || document.body;
+    console.log('Store goods container:', container);
+  } else if (region === 'selected') {
+    container = document.querySelector('div.mainContent:not(._22vl80tk)') || 
+                document.querySelector('div._3ZhYwOCn + div._29dBm1gx') || 
+                document.body;
+    console.log('Selected container:', container);
+  }
   
   for (const selector of selectors) {
     try {
-      const element = document.querySelector(selector);
+      const element = container.querySelector(selector);
       if (element) {
         console.log('Found load more button with selector:', selector);
         console.log('Button element:', element);
@@ -435,7 +448,7 @@ function findLoadMoreButton() {
   }
   
   console.log('Trying text content search...');
-  const allElements = document.querySelectorAll('div, button, span');
+  const allElements = container.querySelectorAll('div, button, span');
   for (const el of allElements) {
     if (el.textContent && el.textContent.includes('查看更多')) {
       console.log('Found load more button by text:', el);
@@ -443,7 +456,7 @@ function findLoadMoreButton() {
     }
   }
   
-  console.log('Load more button not found');
+  console.log('Load more button not found in region:', region);
   return null;
 }
 
@@ -570,15 +583,16 @@ async function waitForLoadMore() {
   });
 }
 
-async function autoLoadMore(pageCount, delayStart, delayEnd) {
+async function autoLoadMore(pageCount, delayStart, delayEnd, region = 'all') {
   console.log('=== Starting auto load more ===');
   console.log('Page count:', pageCount);
   console.log('Delay range:', delayStart, '-', delayEnd, 'seconds');
+  console.log('Region:', region);
   
   for (let i = 0; i < pageCount; i++) {
     console.log('\n--- Page', i + 1, '---');
     
-    const loadMoreBtn = findLoadMoreButton();
+    const loadMoreBtn = findLoadMoreButton(region);
     
     if (!loadMoreBtn) {
       console.log('Load more button not found, stopping auto load');
@@ -601,11 +615,36 @@ async function autoLoadMore(pageCount, delayStart, delayEnd) {
   console.log('\n=== Auto load more completed ===');
 }
 
-function extractProductInfo() {
+function extractProductInfo(region = 'all') {
   const products = [];
   const seenTitles = new Set();
   
-  const productItems = document.querySelectorAll('[data-tooltip-title]');
+  let productItems;
+  
+  if (region === 'storeGoods') {
+    const storeGoodsContainer = document.querySelector('div.mainContent._22vl80tk._3Pga2OjH');
+    if (storeGoodsContainer) {
+      productItems = storeGoodsContainer.querySelectorAll('[data-tooltip-title]');
+    } else {
+      productItems = document.querySelectorAll('[data-tooltip-title]');
+    }
+  } else if (region === 'selected') {
+    const selectedContainer = document.querySelector('div.mainContent:not(._22vl80tk) .js-goods-list');
+    if (selectedContainer) {
+      productItems = selectedContainer.querySelectorAll('[data-tooltip-title]');
+    } else {
+      const altContainer = document.querySelector('div._3ZhYwOCn + div._29dBm1gx');
+      if (altContainer) {
+        productItems = altContainer.querySelectorAll('[data-tooltip-title]');
+      } else {
+        productItems = document.querySelectorAll('[data-tooltip-title]');
+      }
+    }
+  } else {
+    productItems = document.querySelectorAll('[data-tooltip-title]');
+  }
+  
+  console.log('Extracting products from region:', region, '- Found:', productItems.length, 'items');
   
   productItems.forEach((item) => {
     const title = item.getAttribute('data-tooltip-title');
@@ -897,7 +936,8 @@ function handlePreviewExport() {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getProducts') {
     console.log('Received request to get products');
-    const products = extractProductInfo();
+    const region = request.data && request.data.region ? request.data.region : 'all';
+    const products = extractProductInfo(region);
     console.log('Extracted products:', products);
     sendResponse({ success: true, data: products });
   } else if (request.action === 'showPreview') {
@@ -910,9 +950,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   } else if (request.action === 'autoLoadMore') {
     console.log('Received request to auto load more');
-    const { pageCount, delayStart, delayEnd } = request.data;
-    autoLoadMore(pageCount, delayStart, delayEnd).then(() => {
-      const products = extractProductInfo();
+    const { pageCount, delayStart, delayEnd, region } = request.data;
+    autoLoadMore(pageCount, delayStart, delayEnd, region).then(() => {
+      const products = extractProductInfo(region);
       sendResponse({ success: true, data: products });
     }).catch((error) => {
       console.error('Auto load more failed:', error);

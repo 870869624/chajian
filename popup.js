@@ -8,6 +8,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const count = document.getElementById('count');
   
   let products = [];
+  let currentRegion = 'storeGoods';
+
+  function getSelectedRegion() {
+    const selectedRadio = document.querySelector('input[name="pageType"]:checked');
+    if (selectedRadio) {
+      return selectedRadio.value;
+    }
+    return 'storeGoods';
+  }
 
   async function injectContentScript(tabId) {
     try {
@@ -22,13 +31,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function getProductsFromPage() {
+  async function getProductsFromPage(region = 'storeGoods') {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     await injectContentScript(tab.id);
 
     return new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab.id, { action: 'getProducts' }, (response) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'getProducts', data: { region } }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('Send message error:', chrome.runtime.lastError);
           resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -42,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   startBtn.addEventListener('click', async () => {
+    const region = getSelectedRegion();
     const pageCount = parseInt(document.getElementById('pageCount').value) || 1;
     const delayStart = parseFloat(document.getElementById('delayStart').value) || 1;
     const delayEnd = parseFloat(document.getElementById('delayEnd').value) || 3;
@@ -52,19 +62,20 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    status.textContent = '获取中...';
+    const regionName = region === 'storeGoods' ? '店铺商品' : '为您精选';
+    status.textContent = `获取${regionName}中...`;
     status.style.color = '#4080ff';
     
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       await injectContentScript(tab.id);
       
-      status.textContent = `翻页中... (1/${pageCount})`;
+      status.textContent = `${regionName}翻页中... (1/${pageCount})`;
       
       const result = await new Promise((resolve) => {
         chrome.tabs.sendMessage(tab.id, { 
           action: 'autoLoadMore', 
-          data: { pageCount, delayStart, delayEnd } 
+          data: { pageCount, delayStart, delayEnd, region } 
         }, (response) => {
           if (chrome.runtime.lastError) {
             resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -79,11 +90,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (result.success) {
         products = result.data;
         count.textContent = products.length.toString();
-        status.textContent = '获取完成';
+        status.textContent = `${regionName}获取完成`;
         status.style.color = '#4CAF50';
-        console.log('Products received:', products);
+        console.log(`${regionName} received:`, products);
+        currentRegion = region;
       } else {
-        status.textContent = '获取失败: ' + (result.error || '未知错误');
+        status.textContent = `${regionName}获取失败: ` + (result.error || '未知错误');
         status.style.color = '#f44336';
       }
     } catch (error) {
