@@ -399,16 +399,17 @@ function extractImageUrl(imgElement) {
 
 function findLoadMoreButton() {
   const selectors = [
+    'div._2ugbvrpI._3E4sGl93._28_m8Owy.R8mNGZXv._2rMaxXAr',
+    'div._3HKY2899 div[role="button"]',
     'div._3HKY2899',
-    'div[aria-label="查看更多"]',
     'div[aria-label="查看更多商品"]',
+    'div[aria-label="查看更多"]',
     'div[role="button"][aria-label*="查看更多"]',
     'div[role="link"][aria-label*="查看更多"]',
-    'button[aria-label*="查看更多"]',
-    '._2ugbvrpI._3E4sGl93._28_m8Owy.R8mNGZXv._2rMaxXAr'
+    'button[aria-label*="查看更多"]'
   ];
   
-  console.log('Looking for load more button...');
+  console.log('=== Looking for load more button ===');
   
   for (const selector of selectors) {
     try {
@@ -416,6 +417,15 @@ function findLoadMoreButton() {
       if (element) {
         console.log('Found load more button with selector:', selector);
         console.log('Button element:', element);
+        
+        const rect = element.getBoundingClientRect();
+        console.log('Button position:', rect);
+        
+        if (rect.bottom < 0 || rect.top > window.innerHeight) {
+          console.log('Button is not visible, scrolling to it...');
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+        
         return element;
       }
     } catch (e) {
@@ -446,41 +456,117 @@ function delay(seconds) {
 }
 
 function simulateClick(element) {
-  const event = new MouseEvent('click', {
+  console.log('Simulating click on element:', element);
+  
+  const mouseOverEvent = new MouseEvent('mouseover', {
     bubbles: true,
     cancelable: true,
     view: window
   });
-  element.dispatchEvent(event);
+  element.dispatchEvent(mouseOverEvent);
   
-  const touchEvent = new TouchEvent('touchstart', {
+  const mouseDownEvent = new MouseEvent('mousedown', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    buttons: 1
+  });
+  element.dispatchEvent(mouseDownEvent);
+  
+  const mouseUpEvent = new MouseEvent('mouseup', {
+    bubbles: true,
+    cancelable: true,
+    view: window,
+    buttons: 1
+  });
+  element.dispatchEvent(mouseUpEvent);
+  
+  const clickEvent = new MouseEvent('click', {
+    bubbles: true,
+    cancelable: true,
+    view: window
+  });
+  element.dispatchEvent(clickEvent);
+  
+  const touchStartEvent = new TouchEvent('touchstart', {
     bubbles: true,
     cancelable: true
   });
-  element.dispatchEvent(touchEvent);
+  element.dispatchEvent(touchStartEvent);
+  
+  const touchEndEvent = new TouchEvent('touchend', {
+    bubbles: true,
+    cancelable: true
+  });
+  element.dispatchEvent(touchEndEvent);
+  
+  console.log('Click simulation completed');
 }
 
 async function waitForLoadMore() {
+  console.log('Waiting for page to load more content...');
+  
+  const initialCount = document.querySelectorAll('[data-tooltip-title]').length;
+  console.log('Initial product count:', initialCount);
+  
   return new Promise(resolve => {
+    let checkCount = 0;
+    const maxChecks = 20;
+    const checkInterval = 500;
+    
+    const checkIntervalId = setInterval(() => {
+      checkCount++;
+      const currentCount = document.querySelectorAll('[data-tooltip-title]').length;
+      
+      console.log('Check', checkCount, '- Current product count:', currentCount);
+      
+      if (currentCount > initialCount) {
+        console.log('New content loaded!');
+        clearInterval(checkIntervalId);
+        resolve();
+        return;
+      }
+      
+      if (checkCount >= maxChecks) {
+        console.log('Max checks reached, assuming load complete');
+        clearInterval(checkIntervalId);
+        resolve();
+        return;
+      }
+    }, checkInterval);
+    
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (mutation.addedNodes.length > 0) {
-          observer.disconnect();
-          resolve();
-          return;
+          for (const node of mutation.addedNodes) {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if (node.querySelector && node.querySelector('[data-tooltip-title]')) {
+                console.log('Mutation observer detected new product elements');
+                clearInterval(checkIntervalId);
+                observer.disconnect();
+                setTimeout(resolve, 1000);
+                return;
+              }
+            }
+          }
         }
       }
     });
     
-    observer.observe(document.body, {
+    const goodsList = document.querySelector('.js-goods-list') || document.querySelector('._29dBm1gx');
+    const observeTarget = goodsList || document.body;
+    
+    observer.observe(observeTarget, {
       childList: true,
       subtree: true
     });
     
     setTimeout(() => {
+      clearInterval(checkIntervalId);
       observer.disconnect();
+      console.log('Timeout reached, resolving');
       resolve();
-    }, 5000);
+    }, 10000);
   });
 }
 
