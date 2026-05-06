@@ -89,14 +89,45 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  clearBtn.addEventListener('click', () => {
-    products = [];
-    count.textContent = '0';
-    status.textContent = '已清空';
-    status.style.color = '#999';
-  });
+  async function downloadImage(url) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('GET', url, true);
+      xhr.responseType = 'blob';
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          resolve(xhr.response);
+        } else {
+          reject(new Error(`Failed to download image: ${xhr.status}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Failed to download image'));
+      xhr.send();
+    });
+  }
 
-  exportBtn.addEventListener('click', () => {
+  function generateExcelContent(products) {
+    const headers = ['编号', '标题', '售价'];
+    const rows = products.map((p, index) => [
+      index + 1,
+      p.title,
+      p.price
+    ]);
+
+    let content = headers.join('\t') + '\n';
+    rows.forEach(row => {
+      content += row.map(cell => {
+        if (typeof cell === 'string' && cell.includes('\t')) {
+          return `"${cell}"`;
+        }
+        return cell;
+      }).join('\t') + '\n';
+    });
+
+    return content;
+  }
+
+  exportBtn.addEventListener('click', async () => {
     if (products.length === 0) {
       status.textContent = '请先获取商品';
       status.style.color = '#FF9800';
@@ -105,29 +136,52 @@ document.addEventListener('DOMContentLoaded', () => {
     
     status.textContent = '导出中...';
     status.style.color = '#4CAF50';
-    
-    const csvContent = [
-      ['标题', '图片链接', '售价'],
-      ...products.map(p => [p.title, p.imageUrl, p.price])
-    ].map(row => row.map(cell => {
-      if (typeof cell === 'string' && cell.includes(',')) {
-        return `"${cell}"`;
+
+    try {
+      const zip = new JSZip();
+      
+      const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
+      const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
+      
+      for (let i = 0; i < products.length; i++) {
+        const product = products[i];
+        const productFolder = mainFolder.folder(`${i + 1}`);
+        
+        const specFolder = productFolder.folder('规格图');
+        const detailFolder = productFolder.folder('详情图');
+        
+        if (product.imageUrl) {
+          try {
+            const imageBlob = await downloadImage(product.imageUrl);
+            specFolder.file(`${i + 1}.jpeg`, imageBlob);
+            detailFolder.file(`${i + 1}.jpeg`, imageBlob);
+          } catch (error) {
+            console.warn(`Failed to download image for product ${i + 1}:`, error);
+          }
+        }
+        
+        status.textContent = `导出中... (${i + 1}/${products.length})`;
       }
-      return cell;
-    }).join(',')).join('\n');
-    
-    const blob = new Blob([`\uFEFF${csvContent}`], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', 'temu_products.csv');
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    status.textContent = '导出完成';
+      
+      const excelContent = generateExcelContent(products);
+      mainFolder.file('批量上架附加表格.tsv', excelContent);
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      saveAs(content, `导出格式示例_${timestamp}.zip`);
+      
+      status.textContent = '导出完成';
+    } catch (error) {
+      console.error('Export failed:', error);
+      status.textContent = '导出失败: ' + error.message;
+      status.style.color = '#f44336';
+    }
+  });
+
+  clearBtn.addEventListener('click', () => {
+    products = [];
+    count.textContent = '0';
+    status.textContent = '已清空';
+    status.style.color = '#999';
   });
 
   filterBtn.addEventListener('click', () => {
