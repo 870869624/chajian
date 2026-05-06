@@ -1,7 +1,7 @@
 console.log('Content script loaded on:', window.location.href);
 
-const style = document.createElement('style');
-style.textContent = `
+const styleElement = document.createElement('style');
+styleElement.textContent = `
   .plugin-highlight {
     background-color: yellow;
     border: 1px solid orange;
@@ -350,7 +350,7 @@ style.textContent = `
     }
   }
 `;
-document.head.appendChild(style);
+document.head.appendChild(styleElement);
 
 function convertToHighQualityJpg(url) {
   if (!url) return '';
