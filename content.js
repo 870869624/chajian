@@ -667,7 +667,8 @@ function extractProductInfo(region = 'all') {
                        item.querySelector('img[data-cui-image]') ||
                        item.querySelector('img');
     const originalUrl = extractImageUrl(imgElement);
-    const imageUrl = convertToHighQualityJpg(originalUrl);
+    const convertedUrl = convertToHighQualityJpg(originalUrl);
+    const imageUrl = convertedUrl.replace(/[`'"]/g, '').trim();
     
     products.push({
       title: title,

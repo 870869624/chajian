@@ -15,33 +15,40 @@ chrome.action.onClicked.addListener((tab) => {
   console.log('插件图标被点击');
 });
 
-function blobToBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64 = reader.result.split(',')[1];
-      resolve(base64);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 async function downloadImage(url) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url, true);
-    xhr.responseType = 'blob';
-    xhr.onload = () => {
-      if (xhr.status === 200) {
-        resolve(xhr.response);
-      } else {
-        reject(new Error(`Failed to download image: ${xhr.status}`));
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'Accept': 'image/*',
+        'Referer': 'https://www.kwcdn.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Origin': 'https://www.kwcdn.com'
       }
-    };
-    xhr.onerror = () => reject(new Error('Failed to download image'));
-    xhr.send();
-  });
+    });
+    if (!response.ok) {
+      console.error('[Background] Image download HTTP error:', response.status, response.statusText);
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    console.log('[Background] Image blob size:', blob.size, 'bytes');
+    return blob;
+  } catch (error) {
+    console.error('[Background] Error downloading image:', error.message);
+    console.error('[Background] Image URL:', url);
+    throw error;
+  }
 }
 
 function generateExcelContent(products) {
@@ -98,8 +105,9 @@ async function handleExportFromPreview(products, sendResponse) {
       
       if (product.imageUrl) {
         try {
-          console.log('[Background] Downloading image:', product.imageUrl);
-          const imageBlob = await downloadImage(product.imageUrl);
+          const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
+          console.log('[Background] Downloading image:', cleanedUrl);
+          const imageBlob = await downloadImage(cleanedUrl);
           specFolder.file(`${i + 1}.jpeg`, imageBlob);
           detailFolder.file(`${i + 1}.jpeg`, imageBlob);
           console.log('[Background] Image downloaded successfully for product', i + 1);
@@ -121,7 +129,8 @@ async function handleExportFromPreview(products, sendResponse) {
     console.log('[Background] ZIP archive generated, size:', content.size, 'bytes');
     
     console.log('[Background] Converting blob to base64');
-    const base64Data = await blobToBase64(content);
+    const arrayBuffer = await content.arrayBuffer();
+    const base64Data = arrayBufferToBase64(arrayBuffer);
     console.log('[Background] Base64 conversion completed');
     
     console.log('[Background] Starting download');
