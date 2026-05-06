@@ -466,6 +466,7 @@ function createPreviewOverlay(products) {
           <button class="preview-toolbar-btn" id="previewSelectInverseBtn">反选</button>
           <button class="preview-toolbar-btn" id="previewDeselectAllBtn">取消全选</button>
           <button class="preview-toolbar-btn danger" id="previewDeleteSelectedBtn">删除选中</button>
+          <button class="preview-toolbar-btn" id="previewExportBtn" style="background: #4CAF50; border-color: #45a049;">导出选中</button>
         </div>
         <div class="preview-selected-count">已选: <span id="previewSelectedCount">0</span></div>
       </div>
@@ -506,6 +507,7 @@ function createPreviewOverlay(products) {
   document.getElementById('previewSelectInverseBtn').addEventListener('click', previewSelectInverse);
   document.getElementById('previewDeselectAllBtn').addEventListener('click', previewDeselectAll);
   document.getElementById('previewDeleteSelectedBtn').addEventListener('click', previewDeleteSelected);
+  document.getElementById('previewExportBtn').addEventListener('click', handlePreviewExport);
   
   document.getElementById('previewFirstPage').addEventListener('click', goToPreviewFirstPage);
   document.getElementById('previewPrevPage').addEventListener('click', goToPreviewPrevPage);
@@ -655,6 +657,37 @@ function goToPreviewNextPage() {
 function goToPreviewLastPage() {
   currentPreviewPage = Math.max(1, Math.ceil(previewProducts.length / previewPageSize));
   renderPreviewProducts();
+}
+
+function handlePreviewExport() {
+  if (selectedIndices.size === 0) {
+    alert('请先选择要导出的商品');
+    return;
+  }
+  
+  const selectedProducts = [...selectedIndices].sort((a, b) => a - b).map(index => previewProducts[index]);
+  
+  console.log('Selected products for export:', selectedProducts.length);
+  console.log('Product data sample:', selectedProducts.length > 0 ? selectedProducts[0] : 'No products');
+  
+  chrome.runtime.sendMessage({ 
+    action: 'exportFromPreview', 
+    data: selectedProducts 
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error('Export message error:', chrome.runtime.lastError);
+      console.error('Error details:', JSON.stringify(chrome.runtime.lastError));
+      alert('导出失败: ' + chrome.runtime.lastError.message + '\n\n详细信息请查看控制台');
+    } else if (response && response.success) {
+      console.log('Export success:', response);
+      alert('导出成功');
+    } else {
+      console.error('Export failed, no success response');
+      console.error('Response received:', response);
+      const errorMsg = response && response.error ? response.error : '未知错误';
+      alert('导出失败: ' + errorMsg + '\n\n详细信息请查看控制台');
+    }
+  });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {

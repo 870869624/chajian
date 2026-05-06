@@ -17,6 +17,6 @@
       "css": ["content.css"]
     }
   ],
-  "permissions": ["activeTab", "storage", "scripting"],
+  "permissions": ["activeTab", "storage", "scripting", "downloads"],
   "host_permissions": ["<all_urls>"]
 }
