@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function generateExcelContent(products) {
-    const headers = ['编号', '标题', '售价'];
+    const headers = ['序号【必填，用于匹配上传的商品文件夹名】', '商品名称【选填】', '售价'];
     const rows = products.map((p, index) => [
       index + 1,
       p.title,
@@ -181,20 +181,24 @@ document.addEventListener('DOMContentLoaded', () => {
       for (let i = 0; i < products.length; i++) {
         const product = products[i];
         const productFolder = mainFolder.folder(`${i + 1}`);
-        
+
         const specFolder = productFolder.folder('规格图');
         const detailFolder = productFolder.folder('详情图');
-        
+
         if (product.imageUrl) {
           try {
             const imageBlob = await downloadImage(product.imageUrl);
-            specFolder.file(`${i + 1}.jpeg`, imageBlob);
-            detailFolder.file(`${i + 1}.jpeg`, imageBlob);
+            specFolder.file('1-混合色.jpeg', imageBlob);
+            specFolder.file('2-混合色.jpeg', imageBlob);
+            specFolder.file('3-混合色.jpeg', imageBlob);
+            detailFolder.file('1.jpeg', imageBlob);
+            detailFolder.file('2.jpeg', imageBlob);
+            detailFolder.file('3.jpeg', imageBlob);
           } catch (error) {
             console.warn(`Failed to download image for product ${i + 1}:`, error);
           }
         }
-        
+
         status.textContent = `导出中... (${i + 1}/${products.length})`;
       }
       

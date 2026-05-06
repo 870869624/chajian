@@ -52,7 +52,7 @@ async function downloadImage(url) {
 }
 
 function generateExcelContent(products) {
-  const headers = ['编号', '标题', '售价'];
+  const headers = ['序号【必填，用于匹配上传的商品文件夹名】', '商品名称【选填】', '售价'];
   const rows = products.map((p, index) => [
     index + 1,
     p.title,
@@ -108,8 +108,12 @@ async function handleExportFromPreview(products, sendResponse) {
           const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
           console.log('[Background] Downloading image:', cleanedUrl);
           const imageBlob = await downloadImage(cleanedUrl);
-          specFolder.file(`${i + 1}.jpeg`, imageBlob);
-          detailFolder.file(`${i + 1}.jpeg`, imageBlob);
+          specFolder.file('1-混合色.jpeg', imageBlob);
+          specFolder.file('2-混合色.jpeg', imageBlob);
+          specFolder.file('3-混合色.jpeg', imageBlob);
+          detailFolder.file('1.jpeg', imageBlob);
+          detailFolder.file('2.jpeg', imageBlob);
+          detailFolder.file('3.jpeg', imageBlob);
           console.log('[Background] Image downloaded successfully for product', i + 1);
         } catch (error) {
           console.warn('[Background] Failed to download image for product', i + 1, ':', error.message);
