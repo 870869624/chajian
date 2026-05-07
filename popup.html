@@ -72,14 +72,38 @@
       <button id="exportBtn" class="btn primary">导出</button>
     </div>
     
-    <div class="status-bar">
-      <div class="status-item">
-        <span class="status-label">获取状态：</span>
-        <span id="status" class="status-value">未开始</span>
+    <div class="progress-section">
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">翻页进度</span>
+          <span id="pageProgressText" class="progress-text">0/0</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="pageProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="pageStatus" class="progress-status">未开始</span>
       </div>
-      <div class="status-item">
-        <span class="status-label">已获取：</span>
-        <span id="count" class="status-value">0</span>
+      
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">获取进度</span>
+          <span id="fetchProgressText" class="progress-text">0 件</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="fetchProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="fetchStatus" class="progress-status">未开始</span>
+      </div>
+      
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">导出进度</span>
+          <span id="exportProgressText" class="progress-text">0/0</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="exportProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="exportStatus" class="progress-status">未开始</span>
       </div>
     </div>
   </div>

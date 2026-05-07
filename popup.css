@@ -212,31 +212,64 @@ h1 {
   box-shadow: 0 10px 30px rgba(255, 215, 0, 0.5);
 }
 
-.status-bar {
+.progress-section {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 16px;
   padding-top: 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-.status-item {
+.progress-item {
   display: flex;
-  align-items: center;
-  font-size: 13px;
+  flex-direction: column;
   gap: 6px;
 }
 
-.status-label {
-  color: rgba(255, 255, 255, 0.7);
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.status-value {
+.progress-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
+}
+
+.progress-text {
+  font-size: 13px;
   color: #ffffff;
   font-weight: 600;
 }
 
-#status {
-  color: rgba(255, 255, 255, 0.8);
+.progress-bar-container {
+  height: 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #FFD700 0%, #FFA500 100%);
+  border-radius: 4px;
+  width: 0%;
+  transition: width 0.3s ease;
+}
+
+.progress-bar.export {
+  background: linear-gradient(90deg, #4CAF50 0%, #45a049 100%);
+}
+
+.progress-bar.fetch {
+  background: linear-gradient(90deg, #2196F3 0%, #1976D2 100%);
+}
+
+.progress-status {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 input[type="number"]::-webkit-inner-spin-button,

@@ -4,12 +4,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const clearBtn = document.getElementById('clearBtn');
   const exportBtn = document.getElementById('exportBtn');
   const filterBtn = document.getElementById('filterBtn');
-  const status = document.getElementById('status');
-  const count = document.getElementById('count');
   const searchKeywordInput = document.getElementById('searchKeyword');
+  
+  const pageProgressBar = document.getElementById('pageProgressBar');
+  const pageProgressText = document.getElementById('pageProgressText');
+  const pageStatus = document.getElementById('pageStatus');
+  
+  const fetchProgressBar = document.getElementById('fetchProgressBar');
+  const fetchProgressText = document.getElementById('fetchProgressText');
+  const fetchStatus = document.getElementById('fetchStatus');
+  
+  const exportProgressBar = document.getElementById('exportProgressBar');
+  const exportProgressText = document.getElementById('exportProgressText');
+  const exportStatus = document.getElementById('exportStatus');
   
   let products = [];
   let currentRegion = 'storeGoods';
+  let totalPageCount = 0;
 
   function getSelectedRegion() {
     const selectedRadio = document.querySelector('input[name="pageType"]:checked');
@@ -18,6 +29,67 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     return 'storeGoods';
   }
+
+  function updatePageProgress(current, total, statusText, completed = false) {
+    const percentage = total > 0 ? (current / total) * 100 : 0;
+    pageProgressBar.style.width = `${percentage}%`;
+    pageProgressText.textContent = `${current}/${total}`;
+    
+    if (completed) {
+      pageStatus.textContent = statusText;
+      pageStatus.style.color = '#4CAF50';
+    } else {
+      pageStatus.textContent = statusText;
+      pageStatus.style.color = '#4080ff';
+    }
+  }
+
+  function updateFetchProgress(count, statusText, completed = false) {
+    fetchProgressText.textContent = `${count} 件`;
+    
+    if (completed) {
+      fetchStatus.textContent = statusText;
+      fetchStatus.style.color = '#4CAF50';
+      fetchProgressBar.style.width = '100%';
+    } else {
+      fetchStatus.textContent = statusText;
+      fetchStatus.style.color = '#2196F3';
+    }
+  }
+
+  function updateExportProgress(current, total, statusText, completed = false) {
+    const percentage = total > 0 ? (current / total) * 100 : 0;
+    exportProgressBar.style.width = `${percentage}%`;
+    exportProgressText.textContent = `${current}/${total}`;
+    
+    if (completed) {
+      exportStatus.textContent = statusText;
+      exportStatus.style.color = '#4CAF50';
+    } else {
+      exportStatus.textContent = statusText;
+      exportStatus.style.color = '#4CAF50';
+    }
+  }
+
+  function resetProgress() {
+    updatePageProgress(0, totalPageCount, '未开始');
+    pageProgressBar.style.width = '0%';
+    updateFetchProgress(0, '未开始');
+    fetchProgressBar.style.width = '0%';
+    updateExportProgress(0, products.length, '未开始');
+    exportProgressBar.style.width = '0%';
+  }
+
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.action === 'loadMoreProgress') {
+      const progress = request.data;
+      updatePageProgress(progress.current, progress.total, progress.message, progress.completed);
+      
+      if (progress.completed) {
+        updateFetchProgress(0, '正在提取商品数据...');
+      }
+    }
+  });
 
   async function injectContentScript(tabId) {
     try {
@@ -59,10 +131,17 @@ document.addEventListener('DOMContentLoaded', () => {
     const searchKeyword = searchKeywordInput.value.trim();
     
     if (delayStart > delayEnd) {
-      status.textContent = '起始时间不能大于结束时间';
-      status.style.color = '#f44336';
+      fetchStatus.textContent = '起始时间不能大于结束时间';
+      fetchStatus.style.color = '#f44336';
       return;
     }
+    
+    totalPageCount = pageCount;
+    currentRegion = region;
+    
+    resetProgress();
+    updatePageProgress(0, pageCount, '准备翻页...');
+    updateFetchProgress(0, '等待翻页完成...');
     
     let regionName;
     switch(region) {
@@ -82,20 +161,11 @@ document.addEventListener('DOMContentLoaded', () => {
         regionName = '商品';
     }
     
-    currentRegion = region;
-    
-    if (searchKeyword) {
-      status.textContent = `${regionName}中搜索: "${searchKeyword}"...`;
-    } else {
-      status.textContent = `获取${regionName}中...`;
-    }
-    status.style.color = '#4080ff';
-    
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       await injectContentScript(tab.id);
       
-      status.textContent = `${regionName}翻页中... (1/${pageCount})`;
+      updatePageProgress(0, pageCount, searchKeyword ? `${regionName}搜索中...` : `${regionName}翻页中...`);
       
       const result = await new Promise((resolve) => {
         chrome.tabs.sendMessage(tab.id, { 
@@ -114,25 +184,28 @@ document.addEventListener('DOMContentLoaded', () => {
       
       if (result.success) {
         products = result.data;
-        count.textContent = products.length.toString();
-        status.textContent = `${regionName}获取完成`;
-        status.style.color = '#4CAF50';
+        updateFetchProgress(products.length, `${regionName}获取完成`, true);
+        updatePageProgress(pageCount, pageCount, '翻页完成', true);
         console.log(`${regionName} received:`, products);
       } else {
-        status.textContent = `${regionName}获取失败: ` + (result.error || '未知错误');
-        status.style.color = '#f44336';
+        updateFetchProgress(0, `${regionName}获取失败: ${result.error || '未知错误'}`, true);
+        fetchStatus.style.color = '#f44336';
+        updatePageProgress(0, pageCount, '翻页失败', true);
+        pageStatus.style.color = '#f44336';
       }
     } catch (error) {
       console.error('Error getting products:', error);
-      status.textContent = '获取失败: ' + error.message;
-      status.style.color = '#f44336';
+      updateFetchProgress(0, '获取失败: ' + error.message, true);
+      fetchStatus.style.color = '#f44336';
+      updatePageProgress(0, pageCount, '翻页失败', true);
+      pageStatus.style.color = '#f44336';
     }
   });
 
   previewBtn.addEventListener('click', async () => {
     if (products.length === 0) {
-      status.textContent = '请先获取商品';
-      status.style.color = '#FF9800';
+      fetchStatus.textContent = '请先获取商品';
+      fetchStatus.style.color = '#FF9800';
       return;
     }
     
@@ -141,14 +214,14 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.tabs.sendMessage(tab.id, { action: 'showPreview', data: products }, (response) => {
       if (chrome.runtime.lastError) {
         console.error('Send message error:', chrome.runtime.lastError);
-        status.textContent = '预览失败: ' + chrome.runtime.lastError.message;
-        status.style.color = '#f44336';
+        fetchStatus.textContent = '预览失败: ' + chrome.runtime.lastError.message;
+        fetchStatus.style.color = '#f44336';
       } else if (response && response.success) {
-        status.textContent = '预览已打开';
-        status.style.color = '#4CAF50';
+        fetchStatus.textContent = '预览已打开';
+        fetchStatus.style.color = '#4CAF50';
       } else {
-        status.textContent = '预览失败';
-        status.style.color = '#f44336';
+        fetchStatus.textContent = '预览失败';
+        fetchStatus.style.color = '#f44336';
       }
     });
   });
@@ -172,9 +245,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  async function downloadImagesConcurrently(products, concurrency = 5) {
+  async function downloadImagesConcurrently(products, concurrency = 5, onProgress) {
     const results = new Map();
     let index = 0;
+    let completed = 0;
     
     async function worker() {
       while (index < products.length) {
@@ -191,6 +265,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           results.set(i, null);
         }
+        completed++;
+        onProgress(completed);
       }
     }
     
@@ -221,25 +297,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
   exportBtn.addEventListener('click', async () => {
     if (products.length === 0) {
-      status.textContent = '请先获取商品';
-      status.style.color = '#FF9800';
+      exportStatus.textContent = '请先获取商品';
+      exportStatus.style.color = '#FF9800';
       return;
     }
 
-    status.textContent = '正在下载图片...';
-    status.style.color = '#4CAF50';
+    updateExportProgress(0, products.length, '初始化...');
 
     try {
       const zip = new JSZip();
-
       const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
       const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
 
-      status.textContent = '下载图片中... (0/' + products.length + ')';
+      updateExportProgress(0, products.length, '下载图片中...');
       
-      const imageBlobs = await downloadImagesConcurrently(products, 5);
+      const imageBlobs = await downloadImagesConcurrently(products, 5, (completed) => {
+        updateExportProgress(completed, products.length, `下载图片中... (${completed}/${products.length})`);
+      });
       
-      status.textContent = '正在压缩...';
+      updateExportProgress(products.length, products.length, '创建文件夹结构...');
 
       for (let i = 0; i < products.length; i++) {
         const product = products[i];
@@ -258,33 +334,34 @@ document.addEventListener('DOMContentLoaded', () => {
           detailFolder.file('3.jpeg', imageBlob);
         }
 
-        status.textContent = `压缩中... (${i + 1}/${products.length})`;
+        updateExportProgress(i + 1, products.length, `压缩中... (${i + 1}/${products.length})`);
       }
 
       const excelContent = generateExcelContent(products);
       mainFolder.file('批量上架附加表格.xlsx', excelContent);
 
-      status.textContent = '正在生成压缩包...';
+      updateExportProgress(products.length, products.length, '生成压缩包...');
       const content = await zip.generateAsync({ type: 'blob' });
+      
+      updateExportProgress(products.length, products.length, '导出完成', true);
       saveAs(content, `导出格式示例_${timestamp}.zip`);
 
-      status.textContent = '导出完成';
     } catch (error) {
       console.error('Export failed:', error);
-      status.textContent = '导出失败: ' + error.message;
-      status.style.color = '#f44336';
+      updateExportProgress(0, products.length, '导出失败: ' + error.message, true);
+      exportStatus.style.color = '#f44336';
     }
   });
 
   clearBtn.addEventListener('click', () => {
     products = [];
-    count.textContent = '0';
-    status.textContent = '已清空';
-    status.style.color = '#999';
+    resetProgress();
+    fetchStatus.textContent = '已清空';
+    fetchStatus.style.color = '#999';
   });
 
   filterBtn.addEventListener('click', () => {
-    status.textContent = '筛选条件设置';
-    status.style.color = '#FF9800';
+    fetchStatus.textContent = '筛选条件设置';
+    fetchStatus.style.color = '#FF9800';
   });
 });
