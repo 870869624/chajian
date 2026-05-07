@@ -58,9 +58,10 @@ async function downloadImage(url) {
   }
 }
 
-async function downloadImagesConcurrently(products, concurrency = 5) {
+async function downloadImagesConcurrently(products, concurrency = 5, onProgress) {
   const results = new Map();
   let index = 0;
+  let completed = 0;
   
   async function worker() {
     while (index < products.length) {
@@ -80,6 +81,10 @@ async function downloadImagesConcurrently(products, concurrency = 5) {
       } else {
         console.log('[Background] No image URL for product', i + 1);
         results.set(i, null);
+      }
+      completed++;
+      if (onProgress) {
+        onProgress(completed);
       }
     }
   }
@@ -126,6 +131,25 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
+function sendExportProgress(current, total, message, completed = false, success = true, error = '') {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      const activeTab = tabs[0];
+      chrome.tabs.sendMessage(activeTab.id, {
+        action: 'previewExportProgress',
+        data: {
+          current,
+          total,
+          message,
+          completed,
+          success,
+          error
+        }
+      }).catch(() => {});
+    }
+  });
+}
+
 async function handleExportFromPreview(products, sendResponse) {
   console.log('[Background] Starting export process for', products.length, 'products');
   
@@ -137,8 +161,16 @@ async function handleExportFromPreview(products, sendResponse) {
     console.log('[Background] Creating main folder:', `导出格式示例_${timestamp}`);
     const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
     
+    sendExportProgress(0, products.length, '初始化...');
+    
     console.log('[Background] Downloading images concurrently...');
-    const imageBlobs = await downloadImagesConcurrently(products, 5);
+    sendExportProgress(0, products.length, '下载图片中...');
+    
+    const imageBlobs = await downloadImagesConcurrently(products, 5, (completed) => {
+      sendExportProgress(completed, products.length, `下载图片中... (${completed}/${products.length})`);
+    });
+    
+    sendExportProgress(products.length, products.length, '创建文件夹结构...');
     
     for (let i = 0; i < products.length; i++) {
       const product = products[i];
@@ -160,13 +192,17 @@ async function handleExportFromPreview(products, sendResponse) {
       } else {
         console.log('[Background] No image for product', i + 1);
       }
+      
+      sendExportProgress(i + 1, products.length, `处理商品 ${i + 1}/${products.length}...`);
     }
     
+    sendExportProgress(products.length, products.length, '生成Excel表格...');
     console.log('[Background] Generating Excel content');
     const excelContent = generateExcelContent(products);
     mainFolder.file('批量上架附加表格.xlsx', excelContent);
     console.log('[Background] Excel content generated');
     
+    sendExportProgress(products.length, products.length, '生成压缩包...');
     console.log('[Background] Generating ZIP archive');
     const content = await zip.generateAsync({ type: 'blob' });
     console.log('[Background] ZIP archive generated, size:', content.size, 'bytes');
@@ -176,6 +212,7 @@ async function handleExportFromPreview(products, sendResponse) {
     const base64Data = arrayBufferToBase64(arrayBuffer);
     console.log('[Background] Base64 conversion completed');
     
+    sendExportProgress(products.length, products.length, '准备下载...');
     console.log('[Background] Starting download');
     chrome.downloads.download({
       url: `data:application/zip;base64,${base64Data}`,
@@ -184,15 +221,18 @@ async function handleExportFromPreview(products, sendResponse) {
     }, (downloadId) => {
       if (chrome.runtime.lastError) {
         console.error('[Background] Download failed:', chrome.runtime.lastError);
+        sendExportProgress(0, products.length, '导出失败', true, false, '下载失败: ' + chrome.runtime.lastError.message);
         sendResponse({ success: false, error: '下载失败: ' + chrome.runtime.lastError.message });
       } else {
         console.log('[Background] Download started with ID:', downloadId);
+        sendExportProgress(products.length, products.length, '导出完成', true, true);
         sendResponse({ success: true });
       }
     });
   } catch (error) {
     console.error('[Background] Export failed with exception:', error);
     console.error('[Background] Error stack:', error.stack);
+    sendExportProgress(0, products.length, '导出失败', true, false, '导出过程异常: ' + error.message);
     sendResponse({ success: false, error: '导出过程异常: ' + error.message });
   }
 }

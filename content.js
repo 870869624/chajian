@@ -736,6 +736,17 @@ function createPreviewOverlay(products) {
         <div class="preview-selected-count">已选: <span id="previewSelectedCount">0</span></div>
       </div>
       
+      <div class="preview-export-progress" id="previewExportProgress" style="display: none;">
+        <div class="preview-progress-header">
+          <span class="preview-progress-label">导出进度</span>
+          <span id="previewExportProgressText" class="preview-progress-text">0/0</span>
+        </div>
+        <div class="preview-progress-bar-container">
+          <div id="previewExportProgressBar" class="preview-progress-bar"></div>
+        </div>
+        <span id="previewExportStatus" class="preview-progress-status">准备导出...</span>
+      </div>
+      
       <div class="preview-products-grid" id="previewProductsGrid"></div>
       
       <div class="preview-pagination">
@@ -924,6 +935,25 @@ function goToPreviewLastPage() {
   renderPreviewProducts();
 }
 
+function showPreviewExportProgress() {
+  document.getElementById('previewExportProgress').style.display = 'block';
+}
+
+function hidePreviewExportProgress() {
+  document.getElementById('previewExportProgress').style.display = 'none';
+}
+
+function updatePreviewExportProgress(current, total, statusText) {
+  const progressBar = document.getElementById('previewExportProgressBar');
+  const progressText = document.getElementById('previewExportProgressText');
+  const status = document.getElementById('previewExportStatus');
+  
+  const percentage = total > 0 ? (current / total) * 100 : 0;
+  progressBar.style.width = `${percentage}%`;
+  progressText.textContent = `${current}/${total}`;
+  status.textContent = statusText;
+}
+
 function handlePreviewExport() {
   if (selectedIndices.size === 0) {
     alert('请先选择要导出的商品');
@@ -935,20 +965,49 @@ function handlePreviewExport() {
   console.log('Selected products for export:', selectedProducts.length);
   console.log('Product data sample:', selectedProducts.length > 0 ? selectedProducts[0] : 'No products');
   
+  showPreviewExportProgress();
+  updatePreviewExportProgress(0, selectedProducts.length, '初始化...');
+  
+  const exportProgressListener = (request, sender, sendResponse) => {
+    if (request.action === 'previewExportProgress') {
+      const progress = request.data;
+      updatePreviewExportProgress(progress.current, progress.total, progress.message);
+      
+      if (progress.completed) {
+        chrome.runtime.onMessage.removeListener(exportProgressListener);
+        if (progress.success) {
+          setTimeout(() => {
+            hidePreviewExportProgress();
+            alert('导出成功');
+          }, 500);
+        } else {
+          hidePreviewExportProgress();
+          const errorMsg = progress.error || '导出失败';
+          alert('导出失败: ' + errorMsg + '\n\n详细信息请查看控制台');
+        }
+      }
+    }
+  };
+  
+  chrome.runtime.onMessage.addListener(exportProgressListener);
+  
   chrome.runtime.sendMessage({ 
     action: 'exportFromPreview', 
     data: selectedProducts 
   }, (response) => {
+    chrome.runtime.onMessage.removeListener(exportProgressListener);
+    
     if (chrome.runtime.lastError) {
       console.error('Export message error:', chrome.runtime.lastError);
       console.error('Error details:', JSON.stringify(chrome.runtime.lastError));
+      hidePreviewExportProgress();
       alert('导出失败: ' + chrome.runtime.lastError.message + '\n\n详细信息请查看控制台');
     } else if (response && response.success) {
       console.log('Export success:', response);
-      alert('导出成功');
     } else {
       console.error('Export failed, no success response');
       console.error('Response received:', response);
+      hidePreviewExportProgress();
       const errorMsg = response && response.error ? response.error : '未知错误';
       alert('导出失败: ' + errorMsg + '\n\n详细信息请查看控制台');
     }
