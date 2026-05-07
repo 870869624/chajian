@@ -374,16 +374,11 @@ function convertToThumbnailJpg(url) {
   
   const baseUrl = url.split('?')[0];
   
-  const width = 200;
-  const quality = 50;
-  
-  const query = `?imageView2/2/w/${width}/q/${quality}/format/jpeg`;
-  
   if (baseUrl.endsWith('.avif') || baseUrl.endsWith('.webp')) {
-    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + query;
+    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + '?imageView2/2/w/300/q/75/format/jpeg';
   }
   
-  return baseUrl + query;
+  return baseUrl + '?imageView2/2/w/300/q/75/format/jpeg';
 }
 
 function extractImageUrl(imgElement) {
