@@ -307,7 +307,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const zip = new JSZip();
       const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
-      const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
+      const mainFolder = zip.folder(`导出文件_${timestamp}`);
 
       updateExportProgress(0, products.length, '下载图片中...');
       
@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const content = await zip.generateAsync({ type: 'blob' });
       
       updateExportProgress(products.length, products.length, '导出完成', true);
-      saveAs(content, `导出格式示例_${timestamp}.zip`);
+      saveAs(content, `导出文件_${timestamp}.zip`);
 
     } catch (error) {
       console.error('Export failed:', error);

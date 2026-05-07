@@ -158,8 +158,8 @@ async function handleExportFromPreview(products, sendResponse) {
     const zip = new JSZip();
     
     const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
-    console.log('[Background] Creating main folder:', `导出格式示例_${timestamp}`);
-    const mainFolder = zip.folder(`导出格式示例_${timestamp}`);
+    console.log('[Background] Creating main folder:', `导出文件_${timestamp}`);
+    const mainFolder = zip.folder(`导出文件_${timestamp}`);
     
     sendExportProgress(0, products.length, '初始化...');
     
@@ -220,7 +220,7 @@ async function handleExportFromPreview(products, sendResponse) {
     console.log('[Background] Starting download');
     chrome.downloads.download({
       url: `data:application/zip;base64,${base64Data}`,
-      filename: `导出格式示例_${timestamp}.zip`,
+      filename: `导出文件_${timestamp}.zip`,
       saveAs: true
     }, (downloadId) => {
       if (chrome.runtime.lastError) {

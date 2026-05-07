@@ -357,11 +357,16 @@ function convertToHighQualityJpg(url) {
   
   const baseUrl = url.split('?')[0];
   
+  const width = 1340;
+  const height = 1787;
+  
+  const query = `?imageView2/2/w/${width}/h/${height}/q/85/format/jpeg`;
+  
   if (baseUrl.endsWith('.avif') || baseUrl.endsWith('.webp')) {
-    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + '?imageView2/2/w/1000/q/95/format/jpeg';
+    return baseUrl.replace(/\.(avif|webp)$/i, '.jpg') + query;
   }
   
-  return baseUrl + '?imageView2/2/w/1000/q/95/format/jpeg';
+  return baseUrl + query;
 }
 
 function convertToThumbnailJpg(url) {
