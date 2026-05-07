@@ -204,7 +204,11 @@ async function handleExportFromPreview(products, sendResponse) {
     
     sendExportProgress(products.length, products.length, '生成压缩包...');
     console.log('[Background] Generating ZIP archive');
-    const content = await zip.generateAsync({ type: 'blob' });
+    const content = await zip.generateAsync({ 
+      type: 'blob', 
+      compression: 'DEFLATE',
+      compressionOptions: { level: 1 }
+    });
     console.log('[Background] ZIP archive generated, size:', content.size, 'bytes');
     
     console.log('[Background] Converting blob to base64');

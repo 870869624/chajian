@@ -742,7 +742,7 @@ function createPreviewOverlay(products) {
           <span id="previewExportProgressText" class="preview-progress-text">0/0</span>
         </div>
         <div class="preview-progress-bar-container">
-          <div id="previewExportProgressBar" class="preview-progress-bar"></div>
+          <div id="previewExportProgressBar" class="preview-progress-bar" style="width: 0%;"></div>
         </div>
         <span id="previewExportStatus" class="preview-progress-status">准备导出...</span>
       </div>
