@@ -423,7 +423,11 @@ function findLoadMoreButton(region = 'all') {
     'div[aria-label="查看更多"]',
     'div[role="button"][aria-label*="查看更多"]',
     'div[role="link"][aria-label*="查看更多"]',
-    'button[aria-label*="查看更多"]'
+    'button[aria-label*="查看更多"]',
+    'div._2ugbvrpI._1TeP2qll._28_m8Owy',
+    'div[role="button"]:has(span:contains("查看更多"))',
+    '.load-more-button',
+    '.next-page-button'
   ];
   
   console.log('=== Looking for load more button ===');
@@ -431,8 +435,20 @@ function findLoadMoreButton(region = 'all') {
   
   let container = document.body;
   
+  const storeGoodsContainers = [
+    'div._29dBm1gx.autoFitGoodsList',
+    'div.mainContent._22vl80tk._3Pga2OjH',
+    'div._29dBm1gx'
+  ];
+  
   if (region === 'storeGoods') {
-    container = document.querySelector('div.mainContent._22vl80tk._3Pga2OjH') || document.body;
+    for (const selector of storeGoodsContainers) {
+      const found = document.querySelector(selector);
+      if (found) {
+        container = found;
+        break;
+      }
+    }
     console.log('Store goods container:', container);
   } else if (region === 'selected') {
     container = document.querySelector('div.mainContent:not(._22vl80tk)') || 
@@ -634,31 +650,45 @@ async function autoLoadMore(pageCount, delayStart, delayEnd, region = 'all') {
 
 function extractProductInfo(region = 'all', keyword = '') {
   const products = [];
-  const seenTitles = new Set();
+  const seenIds = new Set();
   
-  let productItems;
+  let productItems = [];
   
+  const storeGoodsSelectors = [
+    'div._29dBm1gx.autoFitGoodsList div.Ois68FAW._3qGJLBpe._2Y2Y4-8H',
+    'div._29dBm1gx.autoFitGoodsList div.Ois68FAW._3qGJLBpe',
+    'div.mainContent._22vl80tk._3Pga2OjH [data-tooltip-title]',
+    'div._29dBm1gx [data-tooltip-title]',
+    '[data-tooltip-title]'
+  ];
+  
+  const selectedSelectors = [
+    'div.mainContent:not(._22vl80tk) .js-goods-list [data-tooltip-title]',
+    'div._3ZhYwOCn + div._29dBm1gx [data-tooltip-title]',
+    '[data-tooltip-title]'
+  ];
+  
+  let selectors;
   if (region === 'storeGoods') {
-    const storeGoodsContainer = document.querySelector('div.mainContent._22vl80tk._3Pga2OjH');
-    if (storeGoodsContainer) {
-      productItems = storeGoodsContainer.querySelectorAll('[data-tooltip-title]');
-    } else {
-      productItems = document.querySelectorAll('[data-tooltip-title]');
-    }
+    selectors = storeGoodsSelectors;
   } else if (region === 'selected') {
-    const selectedContainer = document.querySelector('div.mainContent:not(._22vl80tk) .js-goods-list');
-    if (selectedContainer) {
-      productItems = selectedContainer.querySelectorAll('[data-tooltip-title]');
-    } else {
-      const altContainer = document.querySelector('div._3ZhYwOCn + div._29dBm1gx');
-      if (altContainer) {
-        productItems = altContainer.querySelectorAll('[data-tooltip-title]');
-      } else {
-        productItems = document.querySelectorAll('[data-tooltip-title]');
-      }
-    }
+    selectors = selectedSelectors;
   } else {
-    productItems = document.querySelectorAll('[data-tooltip-title]');
+    selectors = ['[data-tooltip-title]'];
+  }
+  
+  for (const selector of selectors) {
+    try {
+      const items = document.querySelectorAll(selector);
+      if (items.length > 0) {
+        productItems = Array.from(items);
+        console.log('Found', items.length, 'items with selector:', selector);
+        break;
+      }
+    } catch (e) {
+      console.log('Selector failed:', selector, e.message);
+      continue;
+    }
   }
   
   console.log('Extracting products from region:', region, '- Found:', productItems.length, 'items');
@@ -667,17 +697,65 @@ function extractProductInfo(region = 'all', keyword = '') {
   const normalizedKeyword = keyword.toLowerCase().trim();
   
   productItems.forEach((item) => {
-    const title = item.getAttribute('data-tooltip-title');
+    const tooltipAttr = item.getAttribute('data-tooltip');
+    let productId = '';
     
-    const priceElement = item.querySelector('span._2XgTiMJi') || 
-                         item.querySelector('[data-type="price"] span');
-    const price = priceElement ? priceElement.textContent.trim() : '';
+    if (tooltipAttr && tooltipAttr.includes('-')) {
+      const match = tooltipAttr.match(/\-(\d+)$/);
+      if (match) {
+        productId = match[1];
+      }
+    }
     
-    if (!price || !title) {
+    if (!productId) {
+      const hrefElement = item.querySelector('a[href*="-g-"]');
+      if (hrefElement) {
+        const hrefMatch = hrefElement.href.match(/-g-(\d+)/);
+        if (hrefMatch) {
+          productId = hrefMatch[1];
+        }
+      }
+    }
+    
+    if (!productId) {
+      productId = item.getAttribute('data-tooltip-title') || '';
+    }
+    
+    if (seenIds.has(productId)) {
       return;
     }
     
-    if (seenTitles.has(title)) {
+    let title = item.getAttribute('data-tooltip-title');
+    
+    if (!title) {
+      const titleElement = item.querySelector('h3, ._2BvQbnbN, ._2D9RBAXL');
+      if (titleElement) {
+        title = titleElement.textContent.trim();
+      }
+    }
+    
+    if (!title) {
+      return;
+    }
+    
+    const priceElement = item.querySelector('span._2XgTiMJi') || 
+                         item.querySelector('[data-type="price"] span') ||
+                         item.querySelector('._382YgpSF span') ||
+                         item.querySelector('._2myxWHLi span');
+    let price = priceElement ? priceElement.textContent.trim() : '';
+    
+    if (!price) {
+      const priceElements = item.querySelectorAll('span');
+      for (const el of priceElements) {
+        if (el.textContent && el.textContent.includes('$')) {
+          price = el.textContent.trim();
+          break;
+        }
+      }
+    }
+    
+    if (!price) {
+      console.log('Skipping product without price:', title);
       return;
     }
     
@@ -685,10 +763,12 @@ function extractProductInfo(region = 'all', keyword = '') {
       return;
     }
     
-    seenTitles.add(title);
+    seenIds.add(productId);
     
     const imgElement = item.querySelector('img.wxWpAMbp._2s7BZSpH.goods-img-external') || 
                        item.querySelector('img[data-cui-image]') ||
+                       item.querySelector('img[data-js-main-img]') ||
+                       item.querySelector('._2Yycy2MJ img') ||
                        item.querySelector('img');
     const originalUrl = extractImageUrl(imgElement);
     const convertedUrl = convertToHighQualityJpg(originalUrl);
