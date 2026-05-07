@@ -627,7 +627,7 @@ async function autoLoadMore(pageCount, delayStart, delayEnd, region = 'all') {
   console.log('\n=== Auto load more completed ===');
 }
 
-function extractProductInfo(region = 'all') {
+function extractProductInfo(region = 'all', keyword = '') {
   const products = [];
   const seenTitles = new Set();
   
@@ -657,6 +657,9 @@ function extractProductInfo(region = 'all') {
   }
   
   console.log('Extracting products from region:', region, '- Found:', productItems.length, 'items');
+  console.log('Filter keyword:', keyword || 'none');
+  
+  const normalizedKeyword = keyword.toLowerCase().trim();
   
   productItems.forEach((item) => {
     const title = item.getAttribute('data-tooltip-title');
@@ -670,6 +673,10 @@ function extractProductInfo(region = 'all') {
     }
     
     if (seenTitles.has(title)) {
+      return;
+    }
+    
+    if (normalizedKeyword && !title.toLowerCase().includes(normalizedKeyword)) {
       return;
     }
     
@@ -690,6 +697,7 @@ function extractProductInfo(region = 'all') {
     });
   });
   
+  console.log('Filtered products count:', products.length);
   return products;
 }
 
@@ -947,11 +955,44 @@ function handlePreviewExport() {
   });
 }
 
+function performSearch(keyword) {
+  console.log('=== Performing search for keyword:', keyword);
+  
+  const searchInput = document.querySelector('input[type="search"]') || 
+                     document.querySelector('input[placeholder*="搜索"]') ||
+                     document.querySelector('input[name*="search"]') ||
+                     document.querySelector('input[aria-label*="搜索"]');
+  
+  if (searchInput) {
+    console.log('Found search input:', searchInput);
+    searchInput.value = keyword;
+    
+    const searchBtn = searchInput.nextElementSibling || 
+                     searchInput.parentElement.querySelector('button') ||
+                     document.querySelector('button[type="submit"]');
+    
+    if (searchBtn) {
+      console.log('Found search button:', searchBtn);
+      simulateClick(searchBtn);
+    } else {
+      console.log('No search button found, triggering input event');
+      searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+      searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    return true;
+  } else {
+    console.log('Search input not found');
+    return false;
+  }
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'getProducts') {
     console.log('Received request to get products');
     const region = request.data && request.data.region ? request.data.region : 'all';
-    const products = extractProductInfo(region);
+    const keyword = request.data && request.data.keyword ? request.data.keyword : '';
+    const products = extractProductInfo(region, keyword);
     console.log('Extracted products:', products);
     sendResponse({ success: true, data: products });
   } else if (request.action === 'showPreview') {
@@ -964,14 +1005,29 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
   } else if (request.action === 'autoLoadMore') {
     console.log('Received request to auto load more');
-    const { pageCount, delayStart, delayEnd, region } = request.data;
-    autoLoadMore(pageCount, delayStart, delayEnd, region).then(() => {
-      const products = extractProductInfo(region);
+    const { pageCount, delayStart, delayEnd, region, searchKeyword } = request.data;
+    
+    async function executeLoadMore() {
+      if (region === 'searchGoods' && searchKeyword) {
+        console.log('Performing search before load more');
+        const searchSuccess = performSearch(searchKeyword);
+        if (searchSuccess) {
+          await delay(2);
+          console.log('Search completed, waiting for results...');
+          await waitForLoadMore(region);
+        }
+      }
+      
+      await autoLoadMore(pageCount, delayStart, delayEnd, region);
+      const products = extractProductInfo(region, searchKeyword);
       sendResponse({ success: true, data: products });
-    }).catch((error) => {
+    }
+    
+    executeLoadMore().catch((error) => {
       console.error('Auto load more failed:', error);
       sendResponse({ success: false, error: error.message });
     });
+    
     return true;
   }
 });

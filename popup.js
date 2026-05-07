@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const filterBtn = document.getElementById('filterBtn');
   const status = document.getElementById('status');
   const count = document.getElementById('count');
+  const searchKeywordInput = document.getElementById('searchKeyword');
   
   let products = [];
   let currentRegion = 'storeGoods';
@@ -31,13 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  async function getProductsFromPage(region = 'storeGoods') {
+  async function getProductsFromPage(region = 'storeGoods', keyword = '') {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     
     await injectContentScript(tab.id);
 
     return new Promise((resolve) => {
-      chrome.tabs.sendMessage(tab.id, { action: 'getProducts', data: { region } }, (response) => {
+      chrome.tabs.sendMessage(tab.id, { action: 'getProducts', data: { region, keyword } }, (response) => {
         if (chrome.runtime.lastError) {
           console.error('Send message error:', chrome.runtime.lastError);
           resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -55,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageCount = parseInt(document.getElementById('pageCount').value) || 1;
     const delayStart = parseFloat(document.getElementById('delayStart').value) || 1;
     const delayEnd = parseFloat(document.getElementById('delayEnd').value) || 3;
+    const searchKeyword = searchKeywordInput.value.trim();
     
     if (delayStart > delayEnd) {
       status.textContent = '起始时间不能大于结束时间';
@@ -62,8 +64,31 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     
-    const regionName = region === 'storeGoods' ? '店铺商品' : '为您精选';
-    status.textContent = `获取${regionName}中...`;
+    let regionName;
+    switch(region) {
+      case 'storeGoods':
+        regionName = '店铺商品';
+        break;
+      case 'selected':
+        regionName = '为您精选';
+        break;
+      case 'searchGoods':
+        regionName = '搜索商品';
+        break;
+      case 'searchGood':
+        regionName = '搜索好物';
+        break;
+      default:
+        regionName = '商品';
+    }
+    
+    currentRegion = region;
+    
+    if (searchKeyword) {
+      status.textContent = `${regionName}中搜索: "${searchKeyword}"...`;
+    } else {
+      status.textContent = `获取${regionName}中...`;
+    }
     status.style.color = '#4080ff';
     
     try {
@@ -75,7 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await new Promise((resolve) => {
         chrome.tabs.sendMessage(tab.id, { 
           action: 'autoLoadMore', 
-          data: { pageCount, delayStart, delayEnd, region } 
+          data: { pageCount, delayStart, delayEnd, region, searchKeyword } 
         }, (response) => {
           if (chrome.runtime.lastError) {
             resolve({ success: false, error: chrome.runtime.lastError.message });
@@ -93,7 +118,6 @@ document.addEventListener('DOMContentLoaded', () => {
         status.textContent = `${regionName}获取完成`;
         status.style.color = '#4CAF50';
         console.log(`${regionName} received:`, products);
-        currentRegion = region;
       } else {
         status.textContent = `${regionName}获取失败: ` + (result.error || '未知错误');
         status.style.color = '#f44336';
