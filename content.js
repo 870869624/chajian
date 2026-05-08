@@ -728,7 +728,7 @@ function extractProductInfo(region = 'all', keyword = '') {
     let title = item.getAttribute('data-tooltip-title');
     
     if (!title) {
-      const titleElement = item.querySelector('h3, ._2BvQbnbN, ._2D9RBAXL');
+      const titleElement = item.querySelector('._2D9RBAXL');
       if (titleElement) {
         title = titleElement.textContent.trim();
       }
