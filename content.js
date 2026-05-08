@@ -701,15 +701,19 @@ function extractProductInfo(region = 'all', keyword = '') {
     try {
       const items = document.querySelectorAll(selector);
       if (items.length > 0) {
-        productItems = Array.from(items);
-        console.log('Found', items.length, 'items with selector:', selector);
-        break;
+        const newItems = Array.from(items);
+        console.log('Found', newItems.length, 'items with selector:', selector);
+        productItems = productItems.concat(newItems);
       }
     } catch (e) {
       console.log('Selector failed:', selector, e.message);
       continue;
     }
   }
+  
+  const uniqueItems = [...new Set(productItems)];
+  console.log('Total unique items after all selectors:', uniqueItems.length);
+  productItems = uniqueItems;
   
   console.log('Extracting products from region:', region, '- Found:', productItems.length, 'items');
   console.log('Filter keyword:', keyword || 'none');
