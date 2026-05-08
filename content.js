@@ -424,7 +424,7 @@ function findLoadMoreButton(region = 'all') {
     'div[role="button"][aria-label*="查看更多"]',
     'div[role="link"][aria-label*="查看更多"]',
     'button[aria-label*="查看更多"]',
-    'div._2ugbvrpI._1TeP2qll._28_m8Owy',
+    'div._2ugbvrpI._1TeP2qll._28_m8Owy.R8mNGZXv',
     'div[role="button"]:has(span:contains("查看更多"))',
     '.load-more-button',
     '.next-page-button'
@@ -461,6 +461,19 @@ function findLoadMoreButton(region = 'all') {
     try {
       const element = container.querySelector(selector);
       if (element) {
+        const ariaLabel = element.getAttribute('aria-label') || '';
+        const dataType = element.getAttribute('data-type') || '';
+        
+        if (dataType === 'goodsCart' || ariaLabel.includes('购物车')) {
+          console.log('Skipping shopping cart button:', selector);
+          continue;
+        }
+        
+        if (ariaLabel && !ariaLabel.includes('查看更多') && !ariaLabel.includes('加载更多') && !ariaLabel.includes('更多')) {
+          console.log('Skipping button with unrelated aria-label:', ariaLabel);
+          continue;
+        }
+        
         console.log('Found load more button with selector:', selector);
         console.log('Button element:', element);
         
@@ -483,6 +496,13 @@ function findLoadMoreButton(region = 'all') {
   console.log('Trying text content search...');
   const allElements = container.querySelectorAll('div, button, span');
   for (const el of allElements) {
+    const ariaLabel = el.getAttribute('aria-label') || '';
+    const dataType = el.getAttribute('data-type') || '';
+    
+    if (dataType === 'goodsCart' || ariaLabel.includes('购物车')) {
+      continue;
+    }
+    
     if (el.textContent && el.textContent.includes('查看更多')) {
       console.log('Found load more button by text:', el);
       return el;
