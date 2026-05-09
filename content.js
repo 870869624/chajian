@@ -210,18 +210,23 @@ styleElement.textContent = `
 
   .preview-product-image-wrapper {
     width: 100% !important;
-    height: 160px !important;
+    height: 140px !important;
     background: #333 !important;
     position: relative !important;
     overflow: hidden !important;
     margin: 0 !important;
     padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
   .preview-product-image-wrapper img {
-    width: 100% !important;
-    height: 100% !important;
-    object-fit: cover !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
     display: block !important;
     border: none !important;
     margin: 0 !important;
@@ -799,6 +804,7 @@ function extractProductInfo(region = 'all', keyword = '') {
     const imageUrl = convertedUrl.replace(/[`'"]/g, '').trim();
     
     products.push({
+      productId: productId,
       title: title,
       imageUrl: imageUrl,
       thumbnailUrl: convertToThumbnailJpg(originalUrl),
