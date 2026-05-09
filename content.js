@@ -374,6 +374,82 @@ styleElement.textContent = `
       font-size: 16px !important;
     }
   }
+
+  .beidou-fab {
+    position: fixed !important;
+    right: 20px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    z-index: 99998 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 8px !important;
+    transition: all 0.3s ease !important;
+  }
+
+  .beidou-fab-btn {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50% !important;
+    border: 2px solid #ffd700 !important;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%) !important;
+    color: #ffd700 !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-direction: column !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3) !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+  }
+
+  .beidou-fab-btn:hover {
+    background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%) !important;
+    color: #1a1a1a !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5) !important;
+  }
+
+  .beidou-fab-btn:active {
+    transform: scale(0.95) !important;
+  }
+
+  .beidou-fab-icon {
+    font-size: 18px !important;
+    margin-bottom: 2px !important;
+  }
+
+  .beidou-fab-text {
+    font-size: 10px !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .beidou-fab-tooltip {
+    position: absolute !important;
+    right: 60px !important;
+    background: rgba(0, 0, 0, 0.9) !important;
+    color: #fff !important;
+    padding: 6px 12px !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.2s ease !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+  }
+
+  .beidou-fab-btn:hover .beidou-fab-tooltip {
+    opacity: 1 !important;
+  }
 `;
 document.head.appendChild(styleElement);
 
@@ -1166,21 +1242,11 @@ function handlePreviewExport() {
     action: 'exportFromPreview', 
     data: selectedProducts 
   }, (response) => {
-    chrome.runtime.onMessage.removeListener(exportProgressListener);
-    
     if (chrome.runtime.lastError) {
       console.error('Export message error:', chrome.runtime.lastError);
-      console.error('Error details:', JSON.stringify(chrome.runtime.lastError));
+      chrome.runtime.onMessage.removeListener(exportProgressListener);
       hidePreviewExportProgress();
       alert('导出失败: ' + chrome.runtime.lastError.message + '\n\n详细信息请查看控制台');
-    } else if (response && response.success) {
-      console.log('Export success:', response);
-    } else {
-      console.error('Export failed, no success response');
-      console.error('Response received:', response);
-      hidePreviewExportProgress();
-      const errorMsg = response && response.error ? response.error : '未知错误';
-      alert('导出失败: ' + errorMsg + '\n\n详细信息请查看控制台');
     }
   });
 }
@@ -1261,3 +1327,54 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
 });
+
+function createFloatingActionButton() {
+  const existing = document.getElementById('beidouFab');
+  if (existing) existing.remove();
+  
+  const fab = document.createElement('div');
+  fab.id = 'beidouFab';
+  fab.className = 'beidou-fab';
+  
+  const btnPreview = document.createElement('button');
+  btnPreview.className = 'beidou-fab-btn';
+  btnPreview.innerHTML = `
+    <span class="beidou-fab-icon">👁</span>
+    <span class="beidou-fab-text">预览</span>
+    <span class="beidou-fab-tooltip">提取并预览当前页面商品</span>
+  `;
+  
+  const btnPanel = document.createElement('button');
+  btnPanel.className = 'beidou-fab-btn';
+  btnPanel.innerHTML = `
+    <span class="beidou-fab-icon">⚙️</span>
+    <span class="beidou-fab-text">面板</span>
+    <span class="beidou-fab-tooltip">打开插件控制面板</span>
+  `;
+  
+  btnPreview.addEventListener('click', () => {
+    const products = extractProductInfo('all', '');
+    if (products.length > 0) {
+      createPreviewOverlay(products);
+    } else {
+      alert('未找到商品数据');
+    }
+  });
+  
+  btnPanel.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ action: 'openPopup' });
+  });
+  
+  fab.appendChild(btnPreview);
+  fab.appendChild(btnPanel);
+  
+  document.body.appendChild(fab);
+}
+
+if (window.location.hostname.includes('temu.com')) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', createFloatingActionButton);
+  } else {
+    createFloatingActionButton();
+  }
+}

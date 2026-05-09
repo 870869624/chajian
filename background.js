@@ -126,8 +126,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       return;
     }
     
-    handleExportFromPreview(request.data, sendResponse);
-    return true;
+    handleExportFromPreview(request.data);
+    sendResponse({ success: true });
+    return;
   }
   
   if (request.action === 'checkExported') {
@@ -139,6 +140,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: false, error: error.message });
     });
     return true;
+  }
+  
+  if (request.action === 'openPopup') {
+    chrome.action.openPopup().catch(() => {
+      console.log('[Background] openPopup failed, trying alternative method');
+    });
+    sendResponse({ success: true });
+    return;
   }
 });
 
@@ -170,7 +179,7 @@ function sendExportProgress(current, total, message, completed = false, success 
   });
 }
 
-async function handleExportFromPreview(products, sendResponse) {
+async function handleExportFromPreview(products) {
   console.log('[Background] Starting export process for', products.length, 'products');
   
   try {
@@ -246,7 +255,6 @@ async function handleExportFromPreview(products, sendResponse) {
       if (chrome.runtime.lastError) {
         console.error('[Background] Download failed:', chrome.runtime.lastError);
         sendExportProgress(0, products.length, '导出失败', true, false, '下载失败: ' + chrome.runtime.lastError.message);
-        sendResponse({ success: false, error: '下载失败: ' + chrome.runtime.lastError.message });
       } else {
         console.log('[Background] Download started with ID:', downloadId);
         
@@ -265,13 +273,11 @@ async function handleExportFromPreview(products, sendResponse) {
         }
         
         sendExportProgress(products.length, products.length, '导出完成', true, true);
-        sendResponse({ success: true });
       }
     });
   } catch (error) {
     console.error('[Background] Export failed with exception:', error);
     console.error('[Background] Error stack:', error.stack);
     sendExportProgress(0, products.length, '导出失败', true, false, '导出过程异常: ' + error.message);
-    sendResponse({ success: false, error: '导出过程异常: ' + error.message });
   }
 }
