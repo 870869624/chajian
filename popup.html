@@ -35,6 +35,11 @@
       </div>
     </div>
     
+    <div class="section" id="searchKeywordSection">
+      <h2 class="section-title">搜索关键词</h2>
+      <input type="text" id="searchKeyword" class="input-field" placeholder="在商品标题中搜索（可选）">
+    </div>
+    
     <div class="section">
       <h2 class="section-title">翻页次数</h2>
       <input type="number" id="pageCount" class="input-field" placeholder="请输入翻页次数" min="1" value="1">
@@ -67,17 +72,60 @@
       <button id="exportBtn" class="btn primary">导出</button>
     </div>
     
-    <div class="status-bar">
-      <div class="status-item">
-        <span class="status-label">获取状态：</span>
-        <span id="status" class="status-value">未开始</span>
+    <div class="progress-section">
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">翻页进度</span>
+          <span id="pageProgressText" class="progress-text">0/0</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="pageProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="pageStatus" class="progress-status">未开始</span>
       </div>
-      <div class="status-item">
-        <span class="status-label">已获取：</span>
-        <span id="count" class="status-value">0</span>
+      
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">获取进度</span>
+          <span id="fetchProgressText" class="progress-text">0 件</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="fetchProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="fetchStatus" class="progress-status">未开始</span>
+      </div>
+      
+      <div class="progress-item">
+        <div class="progress-header">
+          <span class="progress-label">导出进度</span>
+          <span id="exportProgressText" class="progress-text">0/0</span>
+        </div>
+        <div class="progress-bar-container">
+          <div id="exportProgressBar" class="progress-bar"></div>
+        </div>
+        <span id="exportStatus" class="progress-status">未开始</span>
       </div>
     </div>
+    
+    <div class="section record-section">
+      <h2 class="section-title">导出记录</h2>
+      <div class="record-info">
+        <span>已导出商品: <strong id="recordCount">0</strong> 个</span>
+        <span>唯一商品: <strong id="uniqueCount">0</strong> 个</span>
+      </div>
+      <div class="button-group">
+        <button id="exportRecordsBtn" class="btn small">导出记录</button>
+        <button id="importRecordsBtn" class="btn small">导入记录</button>
+        <button id="clearRecordsBtn" class="btn small danger">清空记录</button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json" style="display: none;">
+      <span id="recordStatus" class="record-status"></span>
+    </div>
   </div>
+  <script src="jszip.min.js"></script>
+  <script src="FileSaver.min.js"></script>
+  <script src="xlsx.full.min.js"></script>
+  <script src="db.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

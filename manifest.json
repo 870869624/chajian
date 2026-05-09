@@ -12,17 +12,11 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
+      "matches": ["*://*.temu.com/*"],
       "js": ["content.js"],
       "css": ["content.css"]
     }
   ],
-  "permissions": ["activeTab", "storage", "scripting"],
-  "host_permissions": ["<all_urls>"],
-  "web_accessible_resources": [
-    {
-      "resources": ["preview.html"],
-      "matches": ["<all_urls>"]
-    }
-  ]
+  "permissions": ["activeTab", "storage", "scripting", "downloads"],
+  "host_permissions": ["*://*.temu.com/*"]
 }

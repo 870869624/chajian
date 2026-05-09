@@ -1,3 +1,5 @@
+importScripts('jszip.min.js', 'xlsx.full.min.js', 'db.js');
+
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('插件已安装');
   
@@ -12,3 +14,270 @@ chrome.runtime.onInstalled.addListener((details) => {
 chrome.action.onClicked.addListener((tab) => {
   console.log('插件图标被点击');
 });
+
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+async function downloadImage(url) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      mode: 'cors',
+      headers: {
+        'Accept': 'image/*',
+        'Referer': 'https://www.kwcdn.com/',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Origin': 'https://www.kwcdn.com'
+      },
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      console.error('[Background] Image download HTTP error:', response.status, response.statusText);
+      throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    console.log('[Background] Image blob size:', blob.size, 'bytes');
+    return blob;
+  } catch (error) {
+    console.error('[Background] Error downloading image:', error.message);
+    console.error('[Background] Image URL:', url);
+    throw error;
+  }
+}
+
+async function downloadImagesConcurrently(products, concurrency = 5, onProgress) {
+  const results = new Map();
+  let index = 0;
+  let completed = 0;
+  
+  async function worker() {
+    while (index < products.length) {
+      const i = index++;
+      const product = products[i];
+      if (product.imageUrl) {
+        try {
+          const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
+          console.log('[Background] Downloading image:', cleanedUrl);
+          const imageBlob = await downloadImage(cleanedUrl);
+          results.set(i, imageBlob);
+          console.log('[Background] Image downloaded successfully for product', i + 1);
+        } catch (error) {
+          console.warn('[Background] Failed to download image for product', i + 1, ':', error.message);
+          results.set(i, null);
+        }
+      } else {
+        console.log('[Background] No image URL for product', i + 1);
+        results.set(i, null);
+      }
+      completed++;
+      if (onProgress) {
+        onProgress(completed);
+      }
+    }
+  }
+  
+  const workers = [];
+  for (let i = 0; i < concurrency; i++) {
+    workers.push(worker());
+  }
+  
+  await Promise.all(workers);
+  return results;
+}
+
+function generateExcelContent(products) {
+  const headers = ['序号【必填，用于匹配上传的商品文件夹名】', '商品名称【选填】', '售价'];
+  const rows = products.map((p, index) => [
+    index + 1,
+    p.title,
+    p.price
+  ]);
+
+  const worksheetData = [headers, ...rows];
+  const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, '商品列表');
+
+  return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+}
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'exportFromPreview') {
+    console.log('[Background] Received export request from preview');
+    console.log('[Background] Number of products:', request.data ? request.data.length : 'undefined');
+    console.log('[Background] Product sample:', request.data && request.data.length > 0 ? JSON.stringify(request.data[0]) : 'No data');
+    
+    if (!request.data || !Array.isArray(request.data) || request.data.length === 0) {
+      console.error('[Background] Invalid or empty product data');
+      sendResponse({ success: false, error: '无效的商品数据' });
+      return;
+    }
+    
+    handleExportFromPreview(request.data);
+    sendResponse({ success: true });
+    return;
+  }
+  
+  if (request.action === 'checkExported') {
+    const productIds = request.data || [];
+    checkProductsExported(productIds).then(result => {
+      sendResponse({ success: true, data: result });
+    }).catch(error => {
+      console.error('[Background] checkExported error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
+  
+  if (request.action === 'openPopup') {
+    chrome.action.openPopup().catch(() => {
+      console.log('[Background] openPopup failed, trying alternative method');
+    });
+    sendResponse({ success: true });
+    return;
+  }
+});
+
+async function checkProductsExported(productIds) {
+  const result = {};
+  for (const id of productIds) {
+    const records = await ExportDB.getRecordByProductId(id);
+    result[id] = records.length > 0;
+  }
+  return result;
+}
+
+function sendExportProgress(current, total, message, completed = false, success = true, error = '') {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      const activeTab = tabs[0];
+      chrome.tabs.sendMessage(activeTab.id, {
+        action: 'previewExportProgress',
+        data: {
+          current,
+          total,
+          message,
+          completed,
+          success,
+          error
+        }
+      }).catch(() => {});
+    }
+  });
+}
+
+async function handleExportFromPreview(products) {
+  console.log('[Background] Starting export process for', products.length, 'products');
+  
+  try {
+    console.log('[Background] Creating JSZip instance');
+    const zip = new JSZip();
+    
+    const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
+    console.log('[Background] Creating main folder:', `导出文件_${timestamp}`);
+    const mainFolder = zip.folder(`导出文件_${timestamp}`);
+    
+    sendExportProgress(0, products.length, '初始化...');
+    
+    console.log('[Background] Downloading images concurrently...');
+    sendExportProgress(0, products.length, '下载图片中...');
+    
+    const imageBlobs = await downloadImagesConcurrently(products, 5, (completed) => {
+      sendExportProgress(completed, products.length, `下载图片中... (${completed}/${products.length})`);
+    });
+    
+    sendExportProgress(products.length, products.length, '创建文件夹结构...');
+    
+    for (let i = 0; i < products.length; i++) {
+      const product = products[i];
+      console.log('[Background] Processing product', i + 1, ':', product.title);
+      
+      const productFolder = mainFolder.folder(`${i + 1}`);
+      const specFolder = productFolder.folder('规格图');
+      const detailFolder = productFolder.folder('详情图');
+      
+      const imageBlob = imageBlobs.get(i);
+      if (imageBlob) {
+        specFolder.file('1-混合色.jpeg', imageBlob);
+        specFolder.file('2-混合色.jpeg', imageBlob);
+        specFolder.file('3-混合色.jpeg', imageBlob);
+        detailFolder.file('1.jpeg', imageBlob);
+        detailFolder.file('2.jpeg', imageBlob);
+        detailFolder.file('3.jpeg', imageBlob);
+        console.log('[Background] Image added for product', i + 1);
+      } else {
+        console.log('[Background] No image for product', i + 1);
+      }
+      
+      sendExportProgress(i + 1, products.length, `处理商品 ${i + 1}/${products.length}...`);
+    }
+    
+    sendExportProgress(products.length, products.length, '生成Excel表格...');
+    console.log('[Background] Generating Excel content');
+    const excelContent = generateExcelContent(products);
+    mainFolder.file('批量上架附加表格.xlsx', excelContent);
+    console.log('[Background] Excel content generated');
+    
+    sendExportProgress(products.length, products.length, '生成压缩包...');
+    console.log('[Background] Generating ZIP archive');
+    const content = await zip.generateAsync({ 
+      type: 'blob', 
+      compression: 'DEFLATE',
+      compressionOptions: { level: 1 }
+    });
+    console.log('[Background] ZIP archive generated, size:', content.size, 'bytes');
+    
+    console.log('[Background] Converting blob to base64');
+    const arrayBuffer = await content.arrayBuffer();
+    const base64Data = arrayBufferToBase64(arrayBuffer);
+    console.log('[Background] Base64 conversion completed');
+    
+    sendExportProgress(products.length, products.length, '准备下载...');
+    console.log('[Background] Starting download');
+    chrome.downloads.download({
+      url: `data:application/zip;base64,${base64Data}`,
+      filename: `导出文件_${timestamp}.zip`,
+      saveAs: true
+    }, async (downloadId) => {
+      if (chrome.runtime.lastError) {
+        console.error('[Background] Download failed:', chrome.runtime.lastError);
+        sendExportProgress(0, products.length, '导出失败', true, false, '下载失败: ' + chrome.runtime.lastError.message);
+      } else {
+        console.log('[Background] Download started with ID:', downloadId);
+        
+        try {
+          const records = products.map(p => ({
+            productId: p.productId,
+            title: p.title,
+            price: p.price,
+            imageUrl: p.imageUrl,
+            exportSource: 'preview'
+          }));
+          await ExportDB.addRecords(records);
+          console.log('[Background] Export records saved:', records.length);
+        } catch (dbError) {
+          console.warn('[Background] Failed to save export records:', dbError);
+        }
+        
+        sendExportProgress(products.length, products.length, '导出完成', true, true);
+      }
+    });
+  } catch (error) {
+    console.error('[Background] Export failed with exception:', error);
+    console.error('[Background] Error stack:', error.stack);
+    sendExportProgress(0, products.length, '导出失败', true, false, '导出过程异常: ' + error.message);
+  }
+}
