@@ -189,6 +189,26 @@ styleElement.textContent = `
     box-shadow: 0 0 0 2px rgba(255, 215, 0, 0.4) !important;
   }
 
+  .preview-exported-badge {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    background: rgba(76, 175, 80, 0.9) !important;
+    color: #fff !important;
+    font-size: 11px !important;
+    padding: 3px 8px !important;
+    border-radius: 4px !important;
+    font-weight: 600 !important;
+    z-index: 10 !important;
+    pointer-events: none !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    letter-spacing: 0.5px !important;
+  }
+
+  .preview-product-card.exported {
+    border-color: #4CAF50 !important;
+  }
+
   .preview-product-checkbox {
     position: absolute !important;
     top: 8px !important;
@@ -818,12 +838,27 @@ function extractProductInfo(region = 'all', keyword = '') {
 
 let previewProducts = [];
 let selectedIndices = new Set();
+let exportedProductIds = new Set();
 let currentPreviewPage = 1;
 const previewPageSize = 48;
+
+function checkExportedProducts(productIds) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ action: 'checkExported', data: productIds }, (response) => {
+      if (chrome.runtime.lastError || !response || !response.success) {
+        console.warn('Failed to check exported products:', chrome.runtime.lastError);
+        resolve({});
+        return;
+      }
+      resolve(response.data || {});
+    });
+  });
+}
 
 function createPreviewOverlay(products) {
   previewProducts = products;
   selectedIndices.clear();
+  exportedProductIds.clear();
   currentPreviewPage = 1;
   
   const overlay = document.createElement('div');
@@ -906,6 +941,17 @@ function createPreviewOverlay(products) {
   document.getElementById('previewLastPage').addEventListener('click', goToPreviewLastPage);
   
   renderPreviewProducts();
+  
+  const productIds = products.map(p => p.productId).filter(id => id);
+  if (productIds.length > 0) {
+    checkExportedProducts(productIds).then(result => {
+      exportedProductIds.clear();
+      for (const [id, exported] of Object.entries(result)) {
+        if (exported) exportedProductIds.add(id);
+      }
+      renderPreviewProducts();
+    });
+  }
 }
 
 function closePreviewOverlay() {
@@ -940,9 +986,15 @@ function renderPreviewProducts() {
   grid.innerHTML = pageProducts.map((product, index) => {
     const globalIndex = startIndex + index;
     const isSelected = selectedIndices.has(globalIndex);
+    const isExported = product.productId && exportedProductIds.has(product.productId);
+    const cardClasses = ['preview-product-card'];
+    if (isSelected) cardClasses.push('selected');
+    if (isExported) cardClasses.push('exported');
+    const badgeHtml = isExported ? '<span class="preview-exported-badge">已提取</span>' : '';
     return `
-      <div class="preview-product-card ${isSelected ? 'selected' : ''}" data-index="${globalIndex}">
+      <div class="${cardClasses.join(' ')}" data-index="${globalIndex}">
         <input type="checkbox" class="preview-product-checkbox" ${isSelected ? 'checked' : ''} data-index="${globalIndex}">
+        ${badgeHtml}
         <div class="preview-product-image-wrapper">
           <img src="${product.thumbnailUrl || product.imageUrl}" alt="${product.title}" class="preview-product-image" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%27200%27 height=%27200%27%3E%3Crect fill=%27%23333%27 width=%27200%27 height=%27200%27/%3E%3Ctext fill=%27%23666%27 font-size=%2714%27 x=%2750%25%27 y=%2750%25%27 text-anchor=%27middle%27 dominant-baseline=%27middle%27%3E图片加载失败%3C/text%3E%3C/svg%3E'" />
         </div>
@@ -1091,6 +1143,10 @@ function handlePreviewExport() {
       if (progress.completed) {
         chrome.runtime.onMessage.removeListener(exportProgressListener);
         if (progress.success) {
+          selectedProducts.forEach(p => {
+            if (p.productId) exportedProductIds.add(p.productId);
+          });
+          renderPreviewProducts();
           setTimeout(() => {
             hidePreviewExportProgress();
             alert('导出成功');

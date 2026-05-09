@@ -129,7 +129,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     handleExportFromPreview(request.data, sendResponse);
     return true;
   }
+  
+  if (request.action === 'checkExported') {
+    const productIds = request.data || [];
+    checkProductsExported(productIds).then(result => {
+      sendResponse({ success: true, data: result });
+    }).catch(error => {
+      console.error('[Background] checkExported error:', error);
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
+  }
 });
+
+async function checkProductsExported(productIds) {
+  const result = {};
+  for (const id of productIds) {
+    const records = await ExportDB.getRecordByProductId(id);
+    result[id] = records.length > 0;
+  }
+  return result;
+}
 
 function sendExportProgress(current, total, message, completed = false, success = true, error = '') {
   chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
