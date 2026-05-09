@@ -377,7 +377,7 @@ styleElement.textContent = `
 
   .beidou-fab {
     position: fixed !important;
-    right: 20px !important;
+    left: 20px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
     z-index: 99998 !important;
@@ -434,7 +434,7 @@ styleElement.textContent = `
 
   .beidou-fab-tooltip {
     position: absolute !important;
-    right: 60px !important;
+    left: 60px !important;
     background: rgba(0, 0, 0, 0.9) !important;
     color: #fff !important;
     padding: 6px 12px !important;
