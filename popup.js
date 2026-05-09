@@ -18,9 +18,30 @@ document.addEventListener('DOMContentLoaded', () => {
   const exportProgressText = document.getElementById('exportProgressText');
   const exportStatus = document.getElementById('exportStatus');
   
+  const recordCount = document.getElementById('recordCount');
+  const uniqueCount = document.getElementById('uniqueCount');
+  const exportRecordsBtn = document.getElementById('exportRecordsBtn');
+  const importRecordsBtn = document.getElementById('importRecordsBtn');
+  const clearRecordsBtn = document.getElementById('clearRecordsBtn');
+  const importFileInput = document.getElementById('importFileInput');
+  const recordStatus = document.getElementById('recordStatus');
+  
   let products = [];
   let currentRegion = 'storeGoods';
   let totalPageCount = 0;
+
+  async function updateRecordCounts() {
+    try {
+      const total = await ExportDB.getRecordCount();
+      const unique = await ExportDB.getUniqueProductCount();
+      recordCount.textContent = total;
+      uniqueCount.textContent = unique;
+    } catch (error) {
+      console.error('Failed to update record counts:', error);
+    }
+  }
+
+  updateRecordCounts();
 
   function getSelectedRegion() {
     const selectedRadio = document.querySelector('input[name="pageType"]:checked');
@@ -343,6 +364,21 @@ document.addEventListener('DOMContentLoaded', () => {
       updateExportProgress(products.length, products.length, '生成压缩包...');
       const content = await zip.generateAsync({ type: 'blob' });
       
+      updateExportProgress(products.length, products.length, '保存导出记录...');
+      try {
+        const records = products.map(p => ({
+          productId: p.productId,
+          title: p.title,
+          price: p.price,
+          imageUrl: p.imageUrl,
+          exportSource: 'popup'
+        }));
+        await ExportDB.addRecords(records);
+        console.log('Export records saved:', records.length);
+      } catch (dbError) {
+        console.warn('Failed to save export records:', dbError);
+      }
+      
       updateExportProgress(products.length, products.length, '导出完成', true);
       saveAs(content, `导出文件_${timestamp}.zip`);
 
@@ -363,5 +399,70 @@ document.addEventListener('DOMContentLoaded', () => {
   filterBtn.addEventListener('click', () => {
     fetchStatus.textContent = '筛选条件设置';
     fetchStatus.style.color = '#FF9800';
+  });
+
+  exportRecordsBtn.addEventListener('click', async () => {
+    try {
+      recordStatus.textContent = '正在导出记录...';
+      recordStatus.style.color = '#4080ff';
+      
+      const blob = await ExportDB.exportRecordsToFile();
+      const timestamp = new Date().toISOString().replace(/[-:\.T]/g, '');
+      saveAs(blob, `北斗店铺助手_导出记录_${timestamp}.json`);
+      
+      recordStatus.textContent = '记录导出成功';
+      recordStatus.style.color = '#4CAF50';
+    } catch (error) {
+      console.error('Export records failed:', error);
+      recordStatus.textContent = '导出失败: ' + error.message;
+      recordStatus.style.color = '#f44336';
+    }
+  });
+
+  importRecordsBtn.addEventListener('click', () => {
+    importFileInput.click();
+  });
+
+  importFileInput.addEventListener('change', async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    try {
+      recordStatus.textContent = '正在导入记录...';
+      recordStatus.style.color = '#4080ff';
+      
+      const result = await ExportDB.importRecordsFromFile(file);
+      
+      recordStatus.textContent = `导入完成: 新增 ${result.imported} 条, 重复 ${result.duplicate} 条`;
+      recordStatus.style.color = '#4CAF50';
+      
+      await updateRecordCounts();
+    } catch (error) {
+      console.error('Import records failed:', error);
+      recordStatus.textContent = '导入失败: ' + error.message;
+      recordStatus.style.color = '#f44336';
+    }
+    
+    importFileInput.value = '';
+  });
+
+  clearRecordsBtn.addEventListener('click', async () => {
+    if (confirm('确定要清空所有导出记录吗？此操作不可恢复。')) {
+      try {
+        recordStatus.textContent = '正在清空记录...';
+        recordStatus.style.color = '#4080ff';
+        
+        await ExportDB.clearAllRecords();
+        
+        recordStatus.textContent = '记录已清空';
+        recordStatus.style.color = '#4CAF50';
+        
+        await updateRecordCounts();
+      } catch (error) {
+        console.error('Clear records failed:', error);
+        recordStatus.textContent = '清空失败: ' + error.message;
+        recordStatus.style.color = '#f44336';
+      }
+    }
   });
 });

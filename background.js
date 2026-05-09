@@ -1,4 +1,4 @@
-importScripts('jszip.min.js', 'xlsx.full.min.js');
+importScripts('jszip.min.js', 'xlsx.full.min.js', 'db.js');
 
 chrome.runtime.onInstalled.addListener((details) => {
   console.log('插件已安装');
@@ -222,13 +222,28 @@ async function handleExportFromPreview(products, sendResponse) {
       url: `data:application/zip;base64,${base64Data}`,
       filename: `导出文件_${timestamp}.zip`,
       saveAs: true
-    }, (downloadId) => {
+    }, async (downloadId) => {
       if (chrome.runtime.lastError) {
         console.error('[Background] Download failed:', chrome.runtime.lastError);
         sendExportProgress(0, products.length, '导出失败', true, false, '下载失败: ' + chrome.runtime.lastError.message);
         sendResponse({ success: false, error: '下载失败: ' + chrome.runtime.lastError.message });
       } else {
         console.log('[Background] Download started with ID:', downloadId);
+        
+        try {
+          const records = products.map(p => ({
+            productId: p.productId,
+            title: p.title,
+            price: p.price,
+            imageUrl: p.imageUrl,
+            exportSource: 'preview'
+          }));
+          await ExportDB.addRecords(records);
+          console.log('[Background] Export records saved:', records.length);
+        } catch (dbError) {
+          console.warn('[Background] Failed to save export records:', dbError);
+        }
+        
         sendExportProgress(products.length, products.length, '导出完成', true, true);
         sendResponse({ success: true });
       }

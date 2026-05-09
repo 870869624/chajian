@@ -106,10 +106,26 @@
         <span id="exportStatus" class="progress-status">未开始</span>
       </div>
     </div>
+    
+    <div class="section record-section">
+      <h2 class="section-title">导出记录</h2>
+      <div class="record-info">
+        <span>已导出商品: <strong id="recordCount">0</strong> 个</span>
+        <span>唯一商品: <strong id="uniqueCount">0</strong> 个</span>
+      </div>
+      <div class="button-group">
+        <button id="exportRecordsBtn" class="btn small">导出记录</button>
+        <button id="importRecordsBtn" class="btn small">导入记录</button>
+        <button id="clearRecordsBtn" class="btn small danger">清空记录</button>
+      </div>
+      <input type="file" id="importFileInput" accept=".json" style="display: none;">
+      <span id="recordStatus" class="record-status"></span>
+    </div>
   </div>
   <script src="jszip.min.js"></script>
   <script src="FileSaver.min.js"></script>
   <script src="xlsx.full.min.js"></script>
+  <script src="db.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
