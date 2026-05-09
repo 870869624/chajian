@@ -384,7 +384,11 @@ styleElement.textContent = `
     display: flex !important;
     flex-direction: column !important;
     gap: 8px !important;
-    transition: all 0.3s ease !important;
+    transition: left 0.3s ease, top 0.3s ease, transform 0.3s ease !important;
+  }
+
+  .beidou-fab.collapsed {
+    left: 0px !important;
   }
 
   .beidou-fab-btn {
@@ -449,6 +453,59 @@ styleElement.textContent = `
 
   .beidou-fab-btn:hover .beidou-fab-tooltip {
     opacity: 1 !important;
+  }
+  .beidou-fab-toggle {
+    width: 50px !important;
+    height: 50px !important;
+    border-radius: 50% !important;
+    border: 2px solid #ffd700 !important;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%) !important;
+    color: #ffd700 !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 15px rgba(255, 215, 0, 0.3) !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    position: relative !important;
+    z-index: 99999 !important;
+  }
+
+  .beidou-fab-toggle:hover {
+    background: linear-gradient(135deg, #ffd700 0%, #ffa500 100%) !important;
+    color: #1a1a1a !important;
+    transform: scale(1.1) !important;
+    box-shadow: 0 6px 20px rgba(255, 215, 0, 0.5) !important;
+  }
+
+  .beidou-fab-toggle:active {
+    transform: scale(0.95) !important;
+  }
+
+  .beidou-fab .beidou-fab-btn {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+    transition: opacity 0.3s ease, transform 0.3s ease, width 0.3s ease, height 0.3s ease, margin 0.3s ease !important;
+  }
+
+  .beidou-fab.collapsed .beidou-fab-btn {
+    opacity: 0 !important;
+    transform: translateY(-10px) !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    pointer-events: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .beidou-fab.collapsed .beidou-fab-btn .beidou-fab-tooltip {
+    display: none !important;
   }
 `;
 document.head.appendChild(styleElement);
@@ -1336,6 +1393,11 @@ function createFloatingActionButton() {
   fab.id = 'beidouFab';
   fab.className = 'beidou-fab';
   
+  const btnToggle = document.createElement('button');
+  btnToggle.className = 'beidou-fab-toggle';
+  btnToggle.innerHTML = '◀';
+  btnToggle.title = '收起/展开';
+  
   const btnPreview = document.createElement('button');
   btnPreview.className = 'beidou-fab-btn';
   btnPreview.innerHTML = `
@@ -1352,6 +1414,19 @@ function createFloatingActionButton() {
     <span class="beidou-fab-tooltip">打开插件控制面板</span>
   `;
   
+  let isCollapsed = false;
+  
+  btnToggle.addEventListener('click', () => {
+    isCollapsed = !isCollapsed;
+    if (isCollapsed) {
+      fab.classList.add('collapsed');
+      btnToggle.innerHTML = '▶';
+    } else {
+      fab.classList.remove('collapsed');
+      btnToggle.innerHTML = '◀';
+    }
+  });
+  
   btnPreview.addEventListener('click', () => {
     const products = extractProductInfo('all', '');
     if (products.length > 0) {
@@ -1365,6 +1440,7 @@ function createFloatingActionButton() {
     chrome.runtime.sendMessage({ action: 'openPopup' });
   });
   
+  fab.appendChild(btnToggle);
   fab.appendChild(btnPreview);
   fab.appendChild(btnPanel);
   
