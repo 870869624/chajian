@@ -291,6 +291,27 @@ styleElement.textContent = `
     border: none !important;
   }
 
+  .preview-product-bottom {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: none !important;
+    border: none !important;
+  }
+
+  .preview-product-sales {
+    color: rgba(255, 255, 255, 0.5) !important;
+    font-size: 12px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    background: none !important;
+    border: none !important;
+    white-space: nowrap !important;
+  }
+
   .preview-pagination {
     display: flex !important;
     justify-content: center !important;
@@ -945,6 +966,12 @@ function extractProductInfo(region = 'all', keyword = '') {
       return;
     }
     
+    const salesElement = item.querySelector('[data-type="saleTips"] ._2XgTiMJi');
+    let sales = '';
+    if (salesElement) {
+      sales = salesElement.textContent.trim();
+    }
+    
     seenIds.add(productId);
     
     const imgElement = item.querySelector('img.wxWpAMbp._2s7BZSpH.goods-img-external') || 
@@ -961,7 +988,8 @@ function extractProductInfo(region = 'all', keyword = '') {
       title: title,
       imageUrl: imageUrl,
       thumbnailUrl: convertToThumbnailJpg(originalUrl),
-      price: price
+      price: price,
+      sales: sales
     });
   });
   
@@ -1133,7 +1161,10 @@ function renderPreviewProducts() {
         </div>
         <div class="preview-product-info">
           <h3 class="preview-product-title">${product.title}</h3>
-          <p class="preview-product-price">${product.price}</p>
+          <div class="preview-product-bottom">
+            <span class="preview-product-price">${product.price}</span>
+            ${product.sales ? `<span class="preview-product-sales">${product.sales}</span>` : ''}
+          </div>
         </div>
       </div>
     `;
