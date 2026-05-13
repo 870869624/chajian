@@ -18,5 +18,5 @@
     }
   ],
   "permissions": ["activeTab", "storage", "scripting", "downloads"],
-  "host_permissions": ["*://*.temu.com/*"]
+  "host_permissions": ["*://*.temu.com/*", "*://*.kwcdn.com/*"]
 }

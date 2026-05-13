@@ -248,22 +248,32 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   async function downloadImage(url) {
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('GET', url, true);
-      xhr.responseType = 'blob';
-      xhr.timeout = 30000;
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          resolve(xhr.response);
-        } else {
-          reject(new Error(`Failed to download image: ${xhr.status}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Failed to download image'));
-      xhr.ontimeout = () => reject(new Error('Download timeout'));
-      xhr.send();
-    });
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        mode: 'cors',
+        headers: {
+          'Accept': 'image/*',
+          'Referer': 'https://www.kwcdn.com/',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Origin': 'https://www.kwcdn.com'
+        },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`Failed to download image: ${response.status} ${response.statusText}`);
+      }
+      return await response.blob();
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
   }
 
   async function downloadImagesConcurrently(products, concurrency = 5, onProgress) {
@@ -277,7 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const product = products[i];
         if (product.imageUrl) {
           try {
-            const imageBlob = await downloadImage(product.imageUrl);
+            const cleanedUrl = product.imageUrl.replace(/[`'"]/g, '').trim();
+            const imageBlob = await downloadImage(cleanedUrl);
             results.set(i, imageBlob);
           } catch (error) {
             console.warn(`Failed to download image for product ${i + 1}:`, error);
